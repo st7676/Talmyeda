@@ -62,6 +62,19 @@ export class InstitutionsService {
     };
   }
 
+  /** Raw settings lookup used by other modules (e.g. group-scoped staff access, spec 19). */
+  async getSettings(
+    institutionId: string,
+  ): Promise<InstitutionSettingsDocument> {
+    const settings = await this.settingsModel.findOne({ institutionId }).exec();
+    if (!settings)
+      throw AppError.notFound(
+        'Institution settings not found',
+        'SETTINGS_NOT_FOUND',
+      );
+    return settings;
+  }
+
   /** GET /institutions/me — institution + settings. Spec section 69. */
   async getMe(institutionId: string) {
     const institution = await this.institutionModel

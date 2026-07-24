@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import type { Server } from 'http';
-import * as supertest from 'supertest';
+import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
-const request = supertest as unknown as (
-  app: Server,
-) => supertest.SuperTest<supertest.Test>;
+// `import * as request` loses callability for this CJS module under "module":
+// "nodenext"; require-equals is the safe form.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import request = require('supertest');
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -25,7 +25,7 @@ describe('AppController (e2e)', () => {
   });
 
   it('/ (GET) returns the wrapped success envelope', () => {
-    return request(app.getHttpServer() as Server)
+    return request(app.getHttpServer())
       .get('/')
       .expect(200)
       .expect({ success: true, data: 'Hello World!' });
