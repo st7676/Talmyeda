@@ -34,14 +34,14 @@
 | מודול | סעיף אפיון | סטטוס | הערות |
 |-------|-----------|-------|-------|
 | Institution + InstitutionSettings + register | 46-47, 69 | ✅ הושלם | register יוצר Institution+Admin User+Settings |
-| Platform (SUPER_ADMIN) approve/suspend/reject | 69.1 | ⬜ טרם התחיל | |
+| Platform (SUPER_ADMIN) approve/suspend/reactivate/reject | 69.1 | ✅ הושלם | `platform.controller.ts`, `@Roles(SuperAdmin)` |
 | Users API (CRUD, soft delete, change-password) | 70, 70.1 | ✅ הושלם | controller מלא + temp password + mustChangePassword |
 | Participants API (CRUD, pagination, search) | 71-75, 49 | ✅ הושלם | + group-scoping ל-STAFF, self-scoping ל-PARTICIPANT |
 | Staff API | 76, 50 | ✅ הושלם | Admin-only CRUD + soft delete |
 | Groups API | 77, 51 | ✅ הושלם | CRUD + soft delete |
 | ParticipantGroup (+ היסטוריה) | 78, 52, 18 | ✅ הושלם | assign/deactivate (active=false+endDate, לא מחיקה פיזית) |
 | StaffGroup | 79, 53 | ✅ הושלם | assign/remove |
-| RegistrationRequest + approve/reject | 84, 13-15 | ⬜ טרם התחיל | |
+| RegistrationRequest + approve/reject | 84, 13-15 | ✅ הושלם | submit (public) + list/approve/reject (Admin); approve יוצר Participant ומשתמש אופציונלי לפי `participantUserMode` |
 
 ## מנוע סכימה דינמית (Dynamic Schema Engine)
 
@@ -72,13 +72,15 @@
 - רישום מוסד (`register`) מבצע יצירה סדרתית ללא טרנזקציה (MongoDB standalone לא תומך ב-transactions). יש rollback ידני אם יצירת האדמין/הגדרות נכשלת. אם עוברים ל-replica set — כדאי לעטוף ב-session/transaction.
 - **"Staff (according to institution settings)" ליצירת Participant (סעיף 71):** אין כרגע דגל ב-`InstitutionSettings` שקובע האם STAFF רשאי ליצור Participant — כרגע כל STAFF מורשה (per CASL entity-level). אם בעל המוצר רוצה toggle — צריך להוסיף שדה להגדרות ולבדוק אותו ב-`ParticipantsController`/`Service`.
 - **Group-scoping ל-STAFF (סעיף 19, 519, 833):** ממומש ב-`ParticipantsService` (לא כתנאי CASL native, אלא כלוגיקת שירות שמסננת לפי `StaffGroup`+`ParticipantGroup` כש-`staffGroupManagementEnabled=true`). CASL כרגע אחראי רק לרמת entity (can/cannot על הישות כולה), לא field-level — זה עדיין לא בנוי (חלק מ-Dynamic Schema Engine).
+- **`institutionId` בגוף הבקשה ב-`POST /registration-requests` (סעיף 84, 13):** יוצא דופן מכוון לכלל "לעולם לא institutionId מה-body" (סעיף 91) — השולח אינו מאומת (אין JWT), אז אין מקור אחר. הבקשה יוצרת רק `RegistrationRequest` ב-Pending, לא דאטה עסקית. מתועד ב-DTO עצמו.
+- **`participantUserMode = 'optional'` באישור בקשת הרשמה (סעיף 15):** האפיון לא קובע מי מחליט. החלטה: המנהל המאשר בוחר per-request דרך `createUser` (ברירת מחדל `false`) ב-body של ה-approve. ל-`'always'` תמיד נוצר User, ל-`'never'` אף פעם.
+- **Username אוטומטי כשנוצר User באישור בקשת הרשמה:** אין username בבקשת ההרשמה המקורית (רק firstName/lastName/customFields) — נוצר אוטומטית מ-`firstName.lastName.<סיומת רנדומלית>`. אפשר לשקול לתת למנהל לספק username מותאם ב-body של approve בעתיד.
 
 ## מה הבא בתור (Next up)
 
-1. **RegistrationRequest** (submit/approve/reject) — סעיפים 13-15, 84.
-2. **מנוע הסכימה הדינמית**: FieldDefinition + FieldOption CRUD, ואז DynamicValidationPipe שמחבר את זה ל-Participant/Staff/Group customFields (כרגע customFields מתקבל כ-`[{k,v}]` גולמי בלי ולידציה מול הגדרות שדה) — סעיפים 25-41, 80-83.
-3. **Field-level permissions ב-CASL** (סעיף 21) — ברגע שיש FieldDefinition, לחבר את מטריצת ה-permissions לסינון payload בקשה/תגובה.
-4. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
+1. **מנוע הסכימה הדינמית**: FieldDefinition + FieldOption CRUD, ואז DynamicValidationPipe שמחבר את זה ל-Participant/Staff/Group customFields (כרגע customFields מתקבל כ-`[{k,v}]` גולמי בלי ולידציה מול הגדרות שדה) — סעיפים 25-41, 80-83.
+2. **Field-level permissions ב-CASL** (סעיף 21) — ברגע שיש FieldDefinition, לחבר את מטריצת ה-permissions לסינון payload בקשה/תגובה.
+3. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
 
 ## יומן דחיפות (Session Log)
 
@@ -86,3 +88,4 @@
 |-------|-----------|---------|-------------|
 | 2026-07-24 | Claude (Miryam) | סקיל שיטת עבודה + PROGRESS + תשתית common + Auth/Users/Institution בסיסי | ✅ נדחף |
 | 2026-07-24 | Claude (Miryam) | CASL Ability Factory+Guard, Groups, Participants (+group/self scoping), Staff, ParticipantGroup, StaffGroup | ✅ נדחף |
+| 2026-07-26 | Claude (Miryam) | RegistrationRequest — submit (public) + list/approve/reject (Admin), יצירת Participant+User אופציונלי באישור | ✅ נדחף |

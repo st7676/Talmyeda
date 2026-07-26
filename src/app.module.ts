@@ -17,6 +17,7 @@ import { GroupsModule } from './modules/groups/groups.module';
 import { InstitutionsModule } from './modules/institutions/institutions.module';
 import { ParticipantGroupsModule } from './modules/participant-groups/participant-groups.module';
 import { ParticipantsModule } from './modules/participants/participants.module';
+import { RegistrationRequestsModule } from './modules/registration-requests/registration-requests.module';
 import { StaffGroupsModule } from './modules/staff-groups/staff-groups.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { UsersModule } from './modules/users/users.module';
@@ -38,6 +39,7 @@ import { UsersModule } from './modules/users/users.module';
     StaffModule,
     ParticipantGroupsModule,
     StaffGroupsModule,
+    RegistrationRequestsModule,
   ],
   controllers: [AppController],
   providers: [
