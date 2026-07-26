@@ -13,6 +13,8 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { CaslModule } from './modules/casl/casl.module';
 import { CaslAbilityGuard } from './modules/casl/guards/casl-ability.guard';
+import { FieldDefinitionsModule } from './modules/field-definitions/field-definitions.module';
+import { FieldOptionsModule } from './modules/field-options/field-options.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { InstitutionsModule } from './modules/institutions/institutions.module';
 import { ParticipantGroupsModule } from './modules/participant-groups/participant-groups.module';
@@ -40,6 +42,8 @@ import { UsersModule } from './modules/users/users.module';
     ParticipantGroupsModule,
     StaffGroupsModule,
     RegistrationRequestsModule,
+    FieldOptionsModule,
+    FieldDefinitionsModule,
   ],
   controllers: [AppController],
   providers: [

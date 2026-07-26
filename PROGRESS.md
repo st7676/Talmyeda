@@ -47,12 +47,12 @@
 
 | רכיב | סעיף אפיון | סטטוס | הערות |
 |------|-----------|-------|-------|
-| FieldDefinition CRUD | 25-32, 80-82 | ⬜ טרם התחיל | internalKey אוטומטי |
-| FieldOption CRUD (isActive) | 33-34, 83 | ⬜ טרם התחיל | |
-| customFields Attribute Pattern `[{k,v}]` | 35 | ⬜ טרם התחיל | canonical בכל הישויות |
-| DynamicValidationPipe (type/required/unknown) | 36-37, 94.3 | ⬜ טרם התחיל | |
+| FieldDefinition CRUD | 25-32, 80-82 | ✅ הושלם | internalKey אוטומטי; type-change ו-required-change עוברים בדיקות בטיחות מול דאטה קיים לפני יישום |
+| FieldOption CRUD (isActive) | 33-34, 83 | ✅ הושלם | disable (לא מחיקה פיזית) + institutionId denormalized |
+| customFields Attribute Pattern `[{k,v}]` | 35 | ✅ הושלם | canonical בכל הישויות (Participant/Staff/Group/RegistrationRequest) |
+| DynamicValidationPipe (type/required/unknown) | 36-37, 94.3 | ⬜ טרם התחיל | עדיין אין אכיפה בזמן create/update על Participant/Staff/Group — customFields מתקבל גולמי |
 | Dynamic search / filter / sort | 38-40, 85 | ⬜ טרם התחיל | sort דרך aggregation |
-| אינדקסים מורכבים ל-customFields | 60-61 | ⬜ טרם התחיל | |
+| אינדקסים מורכבים ל-customFields | 60-61 | ✅ הושלם | `{institutionId, customFields.k, customFields.v}` בכל schema רלוונטי |
 
 ## איכות ותשתיות (Cross-cutting)
 
@@ -75,12 +75,16 @@
 - **`institutionId` בגוף הבקשה ב-`POST /registration-requests` (סעיף 84, 13):** יוצא דופן מכוון לכלל "לעולם לא institutionId מה-body" (סעיף 91) — השולח אינו מאומת (אין JWT), אז אין מקור אחר. הבקשה יוצרת רק `RegistrationRequest` ב-Pending, לא דאטה עסקית. מתועד ב-DTO עצמו.
 - **`participantUserMode = 'optional'` באישור בקשת הרשמה (סעיף 15):** האפיון לא קובע מי מחליט. החלטה: המנהל המאשר בוחר per-request דרך `createUser` (ברירת מחדל `false`) ב-body של ה-approve. ל-`'always'` תמיד נוצר User, ל-`'never'` אף פעם.
 - **Username אוטומטי כשנוצר User באישור בקשת הרשמה:** אין username בבקשת ההרשמה המקורית (רק firstName/lastName/customFields) — נוצר אוטומטית מ-`firstName.lastName.<סיומת רנדומלית>`. אפשר לשקול לתת למנהל לספק username מותאם ב-body של approve בעתיד.
+- **required=true עם רשומות קיימות חסרות ערך (סעיף 31):** אם יש רשומות חסרות, `PUT /field-definitions/:id` נכשל עם `REQUIRED_CHANGE_NEEDS_CONFIRMATION` ומספר הרשומות החסרות. Option A (השארה כמו שהיא) = לשלוח שוב עם `confirmRequiredChange:true`. Option B (מילוי ידני קודם) = לתקן את הרשומות דרך endpoints רגילים ואז לשלוח את אותו PUT בלי דגל — הבדיקה תעבור אוטומטית כשהמספר יגיע ל-0.
+- **שינוי fieldType (סעיף 32):** נבדק בפועל מול **כל** הערכים הקיימים תחת אותו `internalKey` בכל הרשומות של המוסד/סוג הישות (Participant/Staff/Group). אם ולו רשומה אחת לא תואמת — כל הבקשה נדחית (`INCOMPATIBLE_FIELD_TYPE_CHANGE`), אין המרה חלקית. לביצועים בקנה מידה גדול ייתכן שיהיה צריך אופטימיזציה (אגרגציה עם projection) — כרגע טוען את כל המסמכים התואמים לזיכרון.
+- **מחיקת FieldDefinition (סעיף 82.1):** מחיקת ה-FieldDefinition עצמה סינכרונית; ניקוי ה-`customFields` מהרשומות הקיימות (`$pull`) הוא "fire-and-forget" — לא ממתינים לו בתגובת ה-API, רק נרשם ללוג בסיום. אין עדיין תשתית job queue אמיתית (Bull/Redis) — זה ריצה ברקע של אותו תהליך Node, לא job עצמאי.
 
 ## מה הבא בתור (Next up)
 
-1. **מנוע הסכימה הדינמית**: FieldDefinition + FieldOption CRUD, ואז DynamicValidationPipe שמחבר את זה ל-Participant/Staff/Group customFields (כרגע customFields מתקבל כ-`[{k,v}]` גולמי בלי ולידציה מול הגדרות שדה) — סעיפים 25-41, 80-83.
-2. **Field-level permissions ב-CASL** (סעיף 21) — ברגע שיש FieldDefinition, לחבר את מטריצת ה-permissions לסינון payload בקשה/תגובה.
-3. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
+1. **DynamicValidationPipe** — לחבר את FieldDefinition/FieldOption לאכיפה בפועל ב-`POST`/`PUT` של Participant/Staff/Group: בדיקת מפתחות לא מוכרים (37), התאמת טיפוס (36, יש כבר `isValueCompatibleWithType` מוכן ב-`common/utils/field-value.util.ts`), אכיפת required, וסינון payload לפי הרשאות שדה (36, 94.3) — סעיפים 25-41.
+2. **Field-level permissions ב-CASL** (סעיף 21) — סינון תגובה/בקשה לפי `permissions.staff`/`permissions.participant` בפועל (המטריצה כבר קיימת ב-FieldDefinition, רק לא נאכפת עדיין).
+3. **Dynamic search/filter/sort** על customFields (סעיפים 38-40, 85) — כרגע `ParticipantsController` תומך רק בחיפוש/סינון על שדות מערכת (firstName/lastName/groupId).
+4. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
 
 ## יומן דחיפות (Session Log)
 
@@ -89,3 +93,4 @@
 | 2026-07-24 | Claude (Miryam) | סקיל שיטת עבודה + PROGRESS + תשתית common + Auth/Users/Institution בסיסי | ✅ נדחף |
 | 2026-07-24 | Claude (Miryam) | CASL Ability Factory+Guard, Groups, Participants (+group/self scoping), Staff, ParticipantGroup, StaffGroup | ✅ נדחף |
 | 2026-07-26 | Claude (Miryam) | RegistrationRequest — submit (public) + list/approve/reject (Admin), יצירת Participant+User אופציונלי באישור | ✅ נדחף |
+| 2026-07-27 | Claude (Miryam) | FieldDefinition + FieldOption CRUD מלא — internalKey אוטומטי, בדיקות בטיחות ל-required/fieldType change מול דאטה קיים, מחיקה עם ניקוי customFields ברקע | ✅ נדחף |
