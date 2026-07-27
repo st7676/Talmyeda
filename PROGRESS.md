@@ -50,7 +50,7 @@
 | FieldDefinition CRUD | 25-32, 80-82 | ✅ הושלם | internalKey אוטומטי; type-change ו-required-change עוברים בדיקות בטיחות מול דאטה קיים לפני יישום |
 | FieldOption CRUD (isActive) | 33-34, 83 | ✅ הושלם | disable (לא מחיקה פיזית) + institutionId denormalized |
 | customFields Attribute Pattern `[{k,v}]` | 35 | ✅ הושלם | canonical בכל הישויות (Participant/Staff/Group/RegistrationRequest) |
-| DynamicValidationPipe (type/required/unknown) | 36-37, 94.3 | ⬜ טרם התחיל | עדיין אין אכיפה בזמן create/update על Participant/Staff/Group — customFields מתקבל גולמי |
+| DynamicValidationPipe (type/required/unknown) | 36-37, 94.3 | ✅ הושלם | `DynamicFieldsValidatorService` — נאכף ב-create/update של Participant/Staff/Group |
 | Dynamic search / filter / sort | 38-40, 85 | ⬜ טרם התחיל | sort דרך aggregation |
 | אינדקסים מורכבים ל-customFields | 60-61 | ✅ הושלם | `{institutionId, customFields.k, customFields.v}` בכל schema רלוונטי |
 
@@ -78,13 +78,16 @@
 - **required=true עם רשומות קיימות חסרות ערך (סעיף 31):** אם יש רשומות חסרות, `PUT /field-definitions/:id` נכשל עם `REQUIRED_CHANGE_NEEDS_CONFIRMATION` ומספר הרשומות החסרות. Option A (השארה כמו שהיא) = לשלוח שוב עם `confirmRequiredChange:true`. Option B (מילוי ידני קודם) = לתקן את הרשומות דרך endpoints רגילים ואז לשלוח את אותו PUT בלי דגל — הבדיקה תעבור אוטומטית כשהמספר יגיע ל-0.
 - **שינוי fieldType (סעיף 32):** נבדק בפועל מול **כל** הערכים הקיימים תחת אותו `internalKey` בכל הרשומות של המוסד/סוג הישות (Participant/Staff/Group). אם ולו רשומה אחת לא תואמת — כל הבקשה נדחית (`INCOMPATIBLE_FIELD_TYPE_CHANGE`), אין המרה חלקית. לביצועים בקנה מידה גדול ייתכן שיהיה צריך אופטימיזציה (אגרגציה עם projection) — כרגע טוען את כל המסמכים התואמים לזיכרון.
 - **מחיקת FieldDefinition (סעיף 82.1):** מחיקת ה-FieldDefinition עצמה סינכרונית; ניקוי ה-`customFields` מהרשומות הקיימות (`$pull`) הוא "fire-and-forget" — לא ממתינים לו בתגובת ה-API, רק נרשם ללוג בסיום. אין עדיין תשתית job queue אמיתית (Bull/Redis) — זה ריצה ברקע של אותו תהליך Node, לא job עצמאי.
+- **DynamicValidationPipe — reject ולא strip (סעיף 36):** האפיון מציע "Automatically strip or reject". בחרתי **reject** (שגיאה חוזרת ללקוח) על ניסיון לכתוב שדה שאין הרשאת edit אליו, במקום לזרוק את הערך בשקט — כדי שכשלים בהרשאות יהיו גלויים ולא יבלעו בלי הודעה. ממומש ב-`DynamicFieldsValidatorService`.
+- **DynamicValidationPipe נאכף רק ב-write (create/update), לא ב-read (סעיף 21):** בדיקת `permissions.staff.edit`/`permissions.participant.edit` פעילה. סינון **תגובה** (הסתרת שדות עם `view:false` מהפלט שחוזר ל-STAFF/PARTICIPANT) עדיין לא ממומש — זה עדיין פער פתוח (ראו "מה הבא בתור").
+- **ADMIN עוקף את כל בדיקות ה-DynamicValidationPipe פרט למבנה/טיפוס:** ADMIN עדיין עובר בדיקת "unknown key"/"invalid type"/"missing required" (בדיקות שלמות דאטה), אבל לא בדיקת הרשאת edit (יש לו תמיד edit מלא, per סעיף 21 editorial note). קריאות פנימיות (כמו `RegistrationRequestsService.approve`) עוברות עם role=ADMIN כברירת מחדל.
 
 ## מה הבא בתור (Next up)
 
-1. **DynamicValidationPipe** — לחבר את FieldDefinition/FieldOption לאכיפה בפועל ב-`POST`/`PUT` של Participant/Staff/Group: בדיקת מפתחות לא מוכרים (37), התאמת טיפוס (36, יש כבר `isValueCompatibleWithType` מוכן ב-`common/utils/field-value.util.ts`), אכיפת required, וסינון payload לפי הרשאות שדה (36, 94.3) — סעיפים 25-41.
-2. **Field-level permissions ב-CASL** (סעיף 21) — סינון תגובה/בקשה לפי `permissions.staff`/`permissions.participant` בפועל (המטריצה כבר קיימת ב-FieldDefinition, רק לא נאכפת עדיין).
-3. **Dynamic search/filter/sort** על customFields (סעיפים 38-40, 85) — כרגע `ParticipantsController` תומך רק בחיפוש/סינון על שדות מערכת (firstName/lastName/groupId).
-4. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
+1. **Field-level READ permissions** (סעיף 21) — סינון תגובה: להסתיר משדה החזרה (GET) כל customFields entry שה-role של המבקש לא רשאי `view` לפיו. ה-write side כבר קיים (`DynamicFieldsValidatorService`); ה-read side עדיין לא.
+2. **Dynamic search/filter/sort** על customFields (סעיפים 38-40, 85) — כרגע `ParticipantsController` תומך רק בחיפוש/סינון על שדות מערכת (firstName/lastName/groupId). לפי סעיף 40, sort על שדה דינמי דורש aggregation pipeline (match על `customFields.k`, sort לפי `customFields.v`) — לא simple index-backed sort.
+3. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
+4. Docker, logging מובנה, טסטים (unit/integration/security) — סעיפים 96, 101, 102.
 
 ## יומן דחיפות (Session Log)
 
@@ -94,3 +97,4 @@
 | 2026-07-24 | Claude (Miryam) | CASL Ability Factory+Guard, Groups, Participants (+group/self scoping), Staff, ParticipantGroup, StaffGroup | ✅ נדחף |
 | 2026-07-26 | Claude (Miryam) | RegistrationRequest — submit (public) + list/approve/reject (Admin), יצירת Participant+User אופציונלי באישור | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | FieldDefinition + FieldOption CRUD מלא — internalKey אוטומטי, בדיקות בטיחות ל-required/fieldType change מול דאטה קיים, מחיקה עם ניקוי customFields ברקע | ✅ נדחף |
+| 2026-07-27 | Claude (Miryam) | DynamicValidationPipe (`DynamicFieldsValidatorService`) — נאכף על create/update של Participant/Staff/Group: unknown-key, type/required, write-permission (reject) | ✅ נדחף |

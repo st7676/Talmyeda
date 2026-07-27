@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { PaginatedResult } from '../../common/interfaces';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { Group, GroupDocument } from './schemas/group.schema';
@@ -12,9 +14,20 @@ import { Group, GroupDocument } from './schemas/group.schema';
 export class GroupsService {
   constructor(
     @InjectModel(Group.name) private readonly groupModel: Model<GroupDocument>,
+    private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
   ) {}
 
-  create(institutionId: string, dto: CreateGroupDto): Promise<GroupDocument> {
+  async create(
+    institutionId: string,
+    dto: CreateGroupDto,
+    actingRole: Role = Role.Admin,
+  ): Promise<GroupDocument> {
+    await this.dynamicFieldsValidator.validate({
+      institutionId,
+      entityType: FieldEntityType.Group,
+      role: actingRole,
+      customFields: dto.customFields ?? [],
+    });
     return this.groupModel.create({
       institutionId,
       name: dto.name,
@@ -52,7 +65,14 @@ export class GroupsService {
     id: string,
     institutionId: string,
     dto: UpdateGroupDto,
+    actingRole: Role = Role.Admin,
   ): Promise<GroupDocument> {
+    await this.dynamicFieldsValidator.validate({
+      institutionId,
+      entityType: FieldEntityType.Group,
+      role: actingRole,
+      customFields: dto.customFields,
+    });
     const group = await this.groupModel
       .findOneAndUpdate(
         { _id: id, institutionId, isDeleted: false },

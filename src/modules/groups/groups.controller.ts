@@ -27,7 +27,11 @@ export class GroupsController {
   @Roles(Role.Admin)
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateGroupDto) {
-    return this.groupsService.create(this.requireInstitution(user), dto);
+    return this.groupsService.create(
+      this.requireInstitution(user),
+      dto,
+      user.role,
+    );
   }
 
   @Get()
@@ -53,7 +57,12 @@ export class GroupsController {
     @Param('id') id: string,
     @Body() dto: UpdateGroupDto,
   ) {
-    return this.groupsService.update(id, this.requireInstitution(user), dto);
+    return this.groupsService.update(
+      id,
+      this.requireInstitution(user),
+      dto,
+      user.role,
+    );
   }
 
   @Roles(Role.Admin)

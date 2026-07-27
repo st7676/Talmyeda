@@ -32,7 +32,11 @@ export class ParticipantsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateParticipantDto,
   ) {
-    return this.participantsService.create(this.requireInstitution(user), dto);
+    return this.participantsService.create(
+      this.requireInstitution(user),
+      dto,
+      user.role,
+    );
   }
 
   @Roles(Role.Admin, Role.Staff)

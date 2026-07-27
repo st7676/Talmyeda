@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { DynamicFieldsModule } from '../dynamic-fields/dynamic-fields.module';
 import { InstitutionsModule } from '../institutions/institutions.module';
 import {
   ParticipantGroup,
@@ -23,6 +24,7 @@ import { Participant, ParticipantSchema } from './schemas/participant.schema';
     ]),
     InstitutionsModule,
     UsersModule,
+    DynamicFieldsModule,
   ],
   controllers: [ParticipantsController],
   providers: [ParticipantsService],

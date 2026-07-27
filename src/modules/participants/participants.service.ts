@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Role } from '../../common/enums';
+import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { AuthenticatedUser, PaginatedResult } from '../../common/interfaces';
+import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { InstitutionsService } from '../institutions/institutions.service';
 import {
   ParticipantGroup,
@@ -30,13 +31,21 @@ export class ParticipantsService {
     private readonly staffGroupModel: Model<StaffGroupDocument>,
     private readonly institutionsService: InstitutionsService,
     private readonly usersService: UsersService,
+    private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
   ) {}
 
   /** POST /participants. Spec section 71 (Administrator, or Staff per settings). */
-  create(
+  async create(
     institutionId: string,
     dto: CreateParticipantDto,
+    actingRole: Role = Role.Admin,
   ): Promise<ParticipantDocument> {
+    await this.dynamicFieldsValidator.validate({
+      institutionId,
+      entityType: FieldEntityType.Participant,
+      role: actingRole,
+      customFields: dto.customFields ?? [],
+    });
     return this.participantModel.create({
       institutionId,
       firstName: dto.firstName,
@@ -105,6 +114,12 @@ export class ParticipantsService {
     // Load first so we can enforce context-aware access before writing (spec 519, 833).
     await this.findOne(id, user);
     const institutionId = this.requireInstitution(user);
+    await this.dynamicFieldsValidator.validate({
+      institutionId,
+      entityType: FieldEntityType.Participant,
+      role: user.role,
+      customFields: dto.customFields,
+    });
     const participant = await this.participantModel
       .findOneAndUpdate(
         { _id: id, institutionId, isDeleted: false },

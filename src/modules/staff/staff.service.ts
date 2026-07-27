@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { PaginatedResult } from '../../common/interfaces';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { Staff, StaffDocument } from './schemas/staff.schema';
@@ -12,9 +14,20 @@ import { Staff, StaffDocument } from './schemas/staff.schema';
 export class StaffService {
   constructor(
     @InjectModel(Staff.name) private readonly staffModel: Model<StaffDocument>,
+    private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
   ) {}
 
-  create(institutionId: string, dto: CreateStaffDto): Promise<StaffDocument> {
+  async create(
+    institutionId: string,
+    dto: CreateStaffDto,
+    actingRole: Role = Role.Admin,
+  ): Promise<StaffDocument> {
+    await this.dynamicFieldsValidator.validate({
+      institutionId,
+      entityType: FieldEntityType.Staff,
+      role: actingRole,
+      customFields: dto.customFields ?? [],
+    });
     return this.staffModel.create({
       institutionId,
       firstName: dto.firstName,
@@ -53,7 +66,14 @@ export class StaffService {
     id: string,
     institutionId: string,
     dto: UpdateStaffDto,
+    actingRole: Role = Role.Admin,
   ): Promise<StaffDocument> {
+    await this.dynamicFieldsValidator.validate({
+      institutionId,
+      entityType: FieldEntityType.Staff,
+      role: actingRole,
+      customFields: dto.customFields,
+    });
     const staff = await this.staffModel
       .findOneAndUpdate(
         { _id: id, institutionId, isDeleted: false },

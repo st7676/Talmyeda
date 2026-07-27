@@ -27,7 +27,11 @@ export class StaffController {
 
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateStaffDto) {
-    return this.staffService.create(this.requireInstitution(user), dto);
+    return this.staffService.create(
+      this.requireInstitution(user),
+      dto,
+      user.role,
+    );
   }
 
   @Get()
@@ -49,7 +53,12 @@ export class StaffController {
     @Param('id') id: string,
     @Body() dto: UpdateStaffDto,
   ) {
-    return this.staffService.update(id, this.requireInstitution(user), dto);
+    return this.staffService.update(
+      id,
+      this.requireInstitution(user),
+      dto,
+      user.role,
+    );
   }
 
   @Delete(':id')
