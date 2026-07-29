@@ -38,10 +38,11 @@ export class GroupsService {
   async findAll(
     institutionId: string,
     pagination: PaginationQueryDto,
-  ): Promise<PaginatedResult<GroupDocument>> {
+    actingRole: Role = Role.Admin,
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     const { page, limit } = pagination;
     const filter = { institutionId, isDeleted: false };
-    const [items, total] = await Promise.all([
+    const [rawItems, total, viewableKeys] = await Promise.all([
       this.groupModel
         .find(filter)
         .sort({ createdAt: -1 })
@@ -49,16 +50,31 @@ export class GroupsService {
         .limit(limit)
         .exec(),
       this.groupModel.countDocuments(filter).exec(),
+      this.dynamicFieldsValidator.getViewableKeys(
+        institutionId,
+        FieldEntityType.Group,
+        actingRole,
+      ),
     ]);
+    const items = rawItems.map((doc) => this.toReadable(doc, viewableKeys));
     return { items, page, limit, total };
   }
 
-  async findOne(id: string, institutionId: string): Promise<GroupDocument> {
+  async findOne(
+    id: string,
+    institutionId: string,
+    actingRole: Role = Role.Admin,
+  ): Promise<Record<string, unknown>> {
     const group = await this.groupModel
       .findOne({ _id: id, institutionId, isDeleted: false })
       .exec();
     if (!group) throw AppError.notFound('Group not found', 'GROUP_NOT_FOUND');
-    return group;
+    const viewableKeys = await this.dynamicFieldsValidator.getViewableKeys(
+      institutionId,
+      FieldEntityType.Group,
+      actingRole,
+    );
+    return this.toReadable(group, viewableKeys);
   }
 
   async update(
@@ -66,7 +82,7 @@ export class GroupsService {
     institutionId: string,
     dto: UpdateGroupDto,
     actingRole: Role = Role.Admin,
-  ): Promise<GroupDocument> {
+  ): Promise<Record<string, unknown>> {
     await this.dynamicFieldsValidator.validate({
       institutionId,
       entityType: FieldEntityType.Group,
@@ -81,7 +97,27 @@ export class GroupsService {
       )
       .exec();
     if (!group) throw AppError.notFound('Group not found', 'GROUP_NOT_FOUND');
-    return group;
+    const viewableKeys = await this.dynamicFieldsValidator.getViewableKeys(
+      institutionId,
+      FieldEntityType.Group,
+      actingRole,
+    );
+    return this.toReadable(group, viewableKeys);
+  }
+
+  /** Applies field-level READ filtering (spec 21) to a document destined for an API response. */
+  private toReadable(
+    doc: GroupDocument,
+    viewableKeys: Set<string> | null,
+  ): Record<string, unknown> {
+    const obj = doc.toObject() as unknown as Record<string, unknown> & {
+      customFields: { k: string; v: unknown }[];
+    };
+    obj.customFields = this.dynamicFieldsValidator.filterByViewableKeys(
+      obj.customFields,
+      viewableKeys,
+    );
+    return obj;
   }
 
   /** Soft delete. Spec section 59. */

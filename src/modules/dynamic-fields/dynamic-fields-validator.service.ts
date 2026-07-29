@@ -105,4 +105,48 @@ export class DynamicFieldsValidatorService {
       );
     }
   }
+
+  /**
+   * Field-level READ permissions (spec section 21). Returns the set of
+   * internalKeys the role may view, or `null` to mean "no filtering needed"
+   * (ADMIN always sees everything). One query per call — callers doing a
+   * list should call this once per page, not once per record, to avoid N+1.
+   *
+   * Entries whose key has no matching FieldDefinition (e.g. left over after
+   * the definition was deleted, or a race with cleanup) are hidden from
+   * non-admins by default — an unrecognized field key is a strictly safer
+   * default than showing it.
+   */
+  async getViewableKeys(
+    institutionId: string,
+    entityType: FieldEntityType,
+    role: Role,
+  ): Promise<Set<string> | null> {
+    if (role === Role.Admin) return null;
+
+    const definitions = await this.fieldDefinitionsService.findActiveForEntity(
+      institutionId,
+      entityType,
+    );
+    const viewable = new Set<string>();
+    for (const definition of definitions) {
+      const rolePermission =
+        role === Role.Staff
+          ? definition.permissions.staff
+          : definition.permissions.participant;
+      if (rolePermission?.view !== false) {
+        viewable.add(definition.internalKey);
+      }
+    }
+    return viewable;
+  }
+
+  /** Pure, synchronous filter — pair with getViewableKeys() to avoid N+1 queries over a list. */
+  filterByViewableKeys<T extends RawCustomFieldEntry>(
+    entries: T[],
+    viewableKeys: Set<string> | null,
+  ): T[] {
+    if (viewableKeys === null) return entries;
+    return entries.filter((entry) => viewableKeys.has(entry.k));
+  }
 }

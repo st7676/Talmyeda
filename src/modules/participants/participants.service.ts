@@ -58,7 +58,7 @@ export class ParticipantsService {
   async findAll(
     user: AuthenticatedUser,
     query: QueryParticipantsDto,
-  ): Promise<PaginatedResult<ParticipantDocument>> {
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     const institutionId = this.requireInstitution(user);
     const { page, limit, search, groupId } = query;
     const filter: Record<string, unknown> = { institutionId, isDeleted: false };
@@ -78,7 +78,7 @@ export class ParticipantsService {
 
     await this.applyContextScope(user, filter);
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total, viewableKeys] = await Promise.all([
       this.participantModel
         .find(filter)
         .sort({ createdAt: -1 })
@@ -86,7 +86,15 @@ export class ParticipantsService {
         .limit(limit)
         .exec(),
       this.participantModel.countDocuments(filter).exec(),
+      // One query for the whole page, not one per record (spec 21 field-level READ).
+      this.dynamicFieldsValidator.getViewableKeys(
+        institutionId,
+        FieldEntityType.Participant,
+        user.role,
+      ),
     ]);
+
+    const items = rawItems.map((doc) => this.toReadable(doc, viewableKeys));
     return { items, page, limit, total };
   }
 
@@ -94,15 +102,14 @@ export class ParticipantsService {
   async findOne(
     id: string,
     user: AuthenticatedUser,
-  ): Promise<ParticipantDocument> {
-    const institutionId = this.requireInstitution(user);
-    const participant = await this.participantModel
-      .findOne({ _id: id, institutionId, isDeleted: false })
-      .exec();
-    if (!participant)
-      throw AppError.notFound('Participant not found', 'PARTICIPANT_NOT_FOUND');
-    await this.assertAccessible(user, participant);
-    return participant;
+  ): Promise<Record<string, unknown>> {
+    const participant = await this.findOneRaw(id, user);
+    const viewableKeys = await this.dynamicFieldsValidator.getViewableKeys(
+      this.requireInstitution(user),
+      FieldEntityType.Participant,
+      user.role,
+    );
+    return this.toReadable(participant, viewableKeys);
   }
 
   /** PUT /participants/:id. Spec section 74 (entity + field permission checks happen upstream). */
@@ -110,9 +117,9 @@ export class ParticipantsService {
     id: string,
     user: AuthenticatedUser,
     dto: UpdateParticipantDto,
-  ): Promise<ParticipantDocument> {
+  ): Promise<Record<string, unknown>> {
     // Load first so we can enforce context-aware access before writing (spec 519, 833).
-    await this.findOne(id, user);
+    await this.findOneRaw(id, user);
     const institutionId = this.requireInstitution(user);
     await this.dynamicFieldsValidator.validate({
       institutionId,
@@ -129,7 +136,42 @@ export class ParticipantsService {
       .exec();
     if (!participant)
       throw AppError.notFound('Participant not found', 'PARTICIPANT_NOT_FOUND');
+    const viewableKeys = await this.dynamicFieldsValidator.getViewableKeys(
+      institutionId,
+      FieldEntityType.Participant,
+      user.role,
+    );
+    return this.toReadable(participant, viewableKeys);
+  }
+
+  /** Internal fetch (raw document, no field filtering) — used by findOne/update for access checks. */
+  private async findOneRaw(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<ParticipantDocument> {
+    const institutionId = this.requireInstitution(user);
+    const participant = await this.participantModel
+      .findOne({ _id: id, institutionId, isDeleted: false })
+      .exec();
+    if (!participant)
+      throw AppError.notFound('Participant not found', 'PARTICIPANT_NOT_FOUND');
+    await this.assertAccessible(user, participant);
     return participant;
+  }
+
+  /** Applies field-level READ filtering (spec 21) to a document destined for an API response. */
+  private toReadable(
+    doc: ParticipantDocument,
+    viewableKeys: Set<string> | null,
+  ): Record<string, unknown> {
+    const obj = doc.toObject() as unknown as Record<string, unknown> & {
+      customFields: { k: string; v: unknown }[];
+    };
+    obj.customFields = this.dynamicFieldsValidator.filterByViewableKeys(
+      obj.customFields,
+      viewableKeys,
+    );
+    return obj;
   }
 
   /** DELETE /participants/:id — soft delete. Spec sections 59, 75. */

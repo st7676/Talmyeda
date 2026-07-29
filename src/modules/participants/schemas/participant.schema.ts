@@ -31,7 +31,9 @@ export class Participant {
   @Prop({ required: true, trim: true })
   lastName: string;
 
-  @Prop({ type: [{ k: String, v: Object }], default: [] })
+  // _id: false — the canonical shape is [{ k, v }] (spec section 35); no
+  // per-entry _id belongs in the API surface.
+  @Prop({ type: [{ k: String, v: Object, _id: false }], default: [] })
   customFields: CustomFieldEntry[];
 
   @Prop({ default: false })

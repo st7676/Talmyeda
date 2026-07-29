@@ -29,7 +29,8 @@ export class Group {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ type: [{ k: String, v: Object }], default: [] })
+  // _id: false — the canonical shape is [{ k, v }] (spec section 35).
+  @Prop({ type: [{ k: String, v: Object, _id: false }], default: [] })
   customFields: CustomFieldEntry[];
 
   @Prop({ default: false })

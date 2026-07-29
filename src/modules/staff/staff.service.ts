@@ -39,10 +39,11 @@ export class StaffService {
   async findAll(
     institutionId: string,
     pagination: PaginationQueryDto,
-  ): Promise<PaginatedResult<StaffDocument>> {
+    actingRole: Role = Role.Admin,
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     const { page, limit } = pagination;
     const filter = { institutionId, isDeleted: false };
-    const [items, total] = await Promise.all([
+    const [rawItems, total, viewableKeys] = await Promise.all([
       this.staffModel
         .find(filter)
         .sort({ createdAt: -1 })
@@ -50,16 +51,31 @@ export class StaffService {
         .limit(limit)
         .exec(),
       this.staffModel.countDocuments(filter).exec(),
+      this.dynamicFieldsValidator.getViewableKeys(
+        institutionId,
+        FieldEntityType.Staff,
+        actingRole,
+      ),
     ]);
+    const items = rawItems.map((doc) => this.toReadable(doc, viewableKeys));
     return { items, page, limit, total };
   }
 
-  async findOne(id: string, institutionId: string): Promise<StaffDocument> {
+  async findOne(
+    id: string,
+    institutionId: string,
+    actingRole: Role = Role.Admin,
+  ): Promise<Record<string, unknown>> {
     const staff = await this.staffModel
       .findOne({ _id: id, institutionId, isDeleted: false })
       .exec();
     if (!staff) throw AppError.notFound('Staff not found', 'STAFF_NOT_FOUND');
-    return staff;
+    const viewableKeys = await this.dynamicFieldsValidator.getViewableKeys(
+      institutionId,
+      FieldEntityType.Staff,
+      actingRole,
+    );
+    return this.toReadable(staff, viewableKeys);
   }
 
   async update(
@@ -67,7 +83,7 @@ export class StaffService {
     institutionId: string,
     dto: UpdateStaffDto,
     actingRole: Role = Role.Admin,
-  ): Promise<StaffDocument> {
+  ): Promise<Record<string, unknown>> {
     await this.dynamicFieldsValidator.validate({
       institutionId,
       entityType: FieldEntityType.Staff,
@@ -82,7 +98,27 @@ export class StaffService {
       )
       .exec();
     if (!staff) throw AppError.notFound('Staff not found', 'STAFF_NOT_FOUND');
-    return staff;
+    const viewableKeys = await this.dynamicFieldsValidator.getViewableKeys(
+      institutionId,
+      FieldEntityType.Staff,
+      actingRole,
+    );
+    return this.toReadable(staff, viewableKeys);
+  }
+
+  /** Applies field-level READ filtering (spec 21) to a document destined for an API response. */
+  private toReadable(
+    doc: StaffDocument,
+    viewableKeys: Set<string> | null,
+  ): Record<string, unknown> {
+    const obj = doc.toObject() as unknown as Record<string, unknown> & {
+      customFields: { k: string; v: unknown }[];
+    };
+    obj.customFields = this.dynamicFieldsValidator.filterByViewableKeys(
+      obj.customFields,
+      viewableKeys,
+    );
+    return obj;
   }
 
   /** Soft delete. Spec section 59. */

@@ -28,7 +28,8 @@ export class Staff {
   @Prop({ required: true, trim: true })
   lastName: string;
 
-  @Prop({ type: [{ k: String, v: Object }], default: [] })
+  // _id: false — the canonical shape is [{ k, v }] (spec section 35).
+  @Prop({ type: [{ k: String, v: Object, _id: false }], default: [] })
   customFields: CustomFieldEntry[];
 
   @Prop({ default: false })

@@ -42,12 +42,17 @@ export class GroupsController {
     return this.groupsService.findAll(
       this.requireInstitution(user),
       pagination,
+      user.role,
     );
   }
 
   @Get(':id')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.groupsService.findOne(id, this.requireInstitution(user));
+    return this.groupsService.findOne(
+      id,
+      this.requireInstitution(user),
+      user.role,
+    );
   }
 
   @Roles(Role.Admin)

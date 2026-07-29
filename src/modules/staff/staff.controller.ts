@@ -39,12 +39,20 @@ export class StaffController {
     @CurrentUser() user: AuthenticatedUser,
     @Query() pagination: PaginationQueryDto,
   ) {
-    return this.staffService.findAll(this.requireInstitution(user), pagination);
+    return this.staffService.findAll(
+      this.requireInstitution(user),
+      pagination,
+      user.role,
+    );
   }
 
   @Get(':id')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.staffService.findOne(id, this.requireInstitution(user));
+    return this.staffService.findOne(
+      id,
+      this.requireInstitution(user),
+      user.role,
+    );
   }
 
   @Put(':id')
