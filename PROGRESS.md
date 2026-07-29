@@ -51,7 +51,7 @@
 | FieldOption CRUD (isActive) | 33-34, 83 | ✅ הושלם | disable (לא מחיקה פיזית) + institutionId denormalized |
 | customFields Attribute Pattern `[{k,v}]` | 35 | ✅ הושלם | canonical בכל הישויות (Participant/Staff/Group/RegistrationRequest) |
 | DynamicValidationPipe (type/required/unknown) | 36-37, 94.3 | ✅ הושלם | `DynamicFieldsValidatorService` — נאכף ב-create/update של Participant/Staff/Group |
-| Dynamic search / filter / sort | 38-40, 85 | ⬜ טרם התחיל | sort דרך aggregation |
+| Dynamic search / filter / sort | 38-40, 85 | ✅ הושלם (Participants) | `?filters={"field_x":"y"}` (רק filterable), `?sortBy=&sortDir=` (רק sortable; שדה דינמי → aggregation pipeline). Staff/Groups עדיין רק שדות מערכת |
 | אינדקסים מורכבים ל-customFields | 60-61 | ✅ הושלם | `{institutionId, customFields.k, customFields.v}` בכל schema רלוונטי |
 
 ## איכות ותשתיות (Cross-cutting)
@@ -83,12 +83,13 @@
 - **תיקון אגבי: `_id:false` על איברי customFields:** גילינו שהמערכים `customFields:[{k,v}]` ב-Participant/Staff/Group/RegistrationRequest קיבלו `_id` אוטומטי מ-Mongoose לכל איבר (לא חלק מהמבנה הקנוני בסעיף 35). תוקן בכל הסכימות.
 - **ביצועי סינון READ:** `getViewableKeys` נקרא **פעם אחת** לכל בקשת GET (גם ברשימה שלמה, לא לכל רשומה) כדי למנוע N+1 שאילתות.
 - **ADMIN עוקף את כל בדיקות ה-DynamicValidationPipe פרט למבנה/טיפוס:** ADMIN עדיין עובר בדיקת "unknown key"/"invalid type"/"missing required" (בדיקות שלמות דאטה), אבל לא בדיקת הרשאת edit (יש לו תמיד edit מלא, per סעיף 21 editorial note). קריאות פנימיות (כמו `RegistrationRequestsService.approve`) עוברות עם role=ADMIN כברירת מחדל.
+- **Dynamic filter/sort מומש רק ב-Participants (סעיפים 38-40):** `filters` הוא JSON string `{internalKey:value}` שהופך ל-`$all`/`$elemMatch` (AND בין כמה שדות), נאכף רק אם `searchSettings.filterable=true`. `sortBy`/`sortDir` — אם `sortBy` הוא שדה מערכת (firstName/lastName/createdAt) ממוינים רגיל; אם זה internalKey עם `searchSettings.sortable=true` — עובר ל-aggregation pipeline (`$addFields`+`$let`+`$filter` לחלץ את הערך מתוך מערך ה-customFields, `$sort` לפיו). **חשוב:** אין עדיין סביבת אינטגרציה עם MongoDB אמיתי בפרויקט (סעיף 102 עדיין לא בנוי) — נתיב ה-aggregation נבדק רק ב-build/lint/e2e-boot (שלא נוגע ב-DB), לא הורץ בפועל מול דאטה אמיתי. מומלץ לבדוק ידנית לפני production. Staff ו-Groups לא קיבלו את אותה הרחבה — יש להם רק pagination בסיסי.
 
 ## מה הבא בתור (Next up)
 
-1. **Dynamic search/filter/sort** על customFields (סעיפים 38-40, 85) — כרגע `ParticipantsController` תומך רק בחיפוש/סינון על שדות מערכת (firstName/lastName/groupId). לפי סעיף 40, sort על שדה דינמי דורש aggregation pipeline (match על `customFields.k`, sort לפי `customFields.v`) — לא simple index-backed sort.
-2. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
-3. Docker, logging מובנה, טסטים (unit/integration/security) — סעיפים 96, 101, 102.
+1. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
+2. Docker, logging מובנה, טסטים (unit/integration/security) — סעיפים 96, 101, 102. **בפרט:** אין עדיין שום טסט אמיתי מול MongoDB — כדאי שזה יהיה בעדיפות גבוהה כדי לאמת את ה-aggregation pipeline של דירוג דינמי ואת שאר לוגיקת ה-DB.
+3. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה).
 
 ## יומן דחיפות (Session Log)
 
@@ -100,3 +101,4 @@
 | 2026-07-27 | Claude (Miryam) | FieldDefinition + FieldOption CRUD מלא — internalKey אוטומטי, בדיקות בטיחות ל-required/fieldType change מול דאטה קיים, מחיקה עם ניקוי customFields ברקע | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | DynamicValidationPipe (`DynamicFieldsValidatorService`) — נאכף על create/update של Participant/Staff/Group: unknown-key, type/required, write-permission (reject) | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | Field-level READ permissions — סינון customFields ב-GET לפי `view` permission; תיקון `_id:false` על customFields entries | ✅ נדחף |
+| 2026-07-27 | Claude (Miryam) | Dynamic search/filter/sort ל-Participants — `filters` JSON + `sortBy`/`sortDir` עם aggregation pipeline לשדות דינמיים (לא נבדק עדיין מול DB אמיתי) | ✅ נדחף |
