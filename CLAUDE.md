@@ -13,6 +13,7 @@
 
 Talmyeda — פלטפורמת SaaS גנרית, רב-דיירותית (multi-tenant), לניהול מוסדות חינוך.
 אפיון מלא: [`SPEC.md.DOC`](SPEC.md.DOC) (מסמך Word). מצב התקדמות: [`PROGRESS.md`](PROGRESS.md).
+תיעוד מורחב (איך המערכת עובדת, הסבר על כל מודול, מילון מונחים): [`docs/README.md`](docs/README.md).
 
 ## עקרונות שאסור להפר
 

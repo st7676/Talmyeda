@@ -102,3 +102,4 @@
 | 2026-07-27 | Claude (Miryam) | DynamicValidationPipe (`DynamicFieldsValidatorService`) — נאכף על create/update של Participant/Staff/Group: unknown-key, type/required, write-permission (reject) | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | Field-level READ permissions — סינון customFields ב-GET לפי `view` permission; תיקון `_id:false` על customFields entries | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | Dynamic search/filter/sort ל-Participants — `filters` JSON + `sortBy`/`sortDir` עם aggregation pipeline לשדות דינמיים (לא נבדק עדיין מול DB אמיתי) | ✅ נדחף |
+| 2026-07-27 | Claude (Miryam) | תיעוד: תיקיית `docs/` עם 11 קבצים — הסבר כללי, מבנה פרויקט, כל מודול לעומק, ומילון מונחים (כולל Docker) | ✅ נדחף |
