@@ -23,6 +23,20 @@
 | 10 | [`10-dynamic-schema-engine.md`](10-dynamic-schema-engine.md) | שדות דינמיים (FieldDefinition/FieldOption) — הלב של הגמישות במערכת |
 | 11 | [`11-glossary.md`](11-glossary.md) | מילון מונחים למי שפחות מכיר: Docker, JWT, DTO, Guard ועוד |
 
+## העמקה נוספת — תמלול מורחב מהצ'אט
+
+הקבצים הבאים הם **גרסה מלאה ומפורטת יותר** (כולל דוגמאות קוד עם מספרי
+שורות) של חלק מהנושאים למעלה — במקור נכתבו כמענה לשאלות "הסבר שורה
+שורה" ו"הסבר מורחב" בצ'אט הפיתוח, ונשמרו כאן כדי שלא יאבדו בהיסטוריית
+הצ'אט:
+
+| # | קובץ | על מה זה |
+|---|------|----------|
+| 12 | [`12-code-walkthrough-common.md`](12-code-walkthrough-common.md) | `src/common/` שורה-שורה: כל enum, interface, decorator, filter, util |
+| 13 | [`13-code-walkthrough-auth-users.md`](13-code-walkthrough-auth-users.md) | Auth ו-Users שורה-שורה: JWT strategy, guards, service, controller |
+| 14 | [`14-docker-explained.md`](14-docker-explained.md) | Docker מהיסוד: container מול VM, image מול container, Dockerfile, docker-compose, volumes |
+| 15 | [`15-enum-vs-union-types.md`](15-enum-vs-union-types.md) | TypeScript: מתי `enum` ומתי union type, ולמה זה משנה ב-runtime |
+
 ## עקרון-על שכדאי לזכור תוך כדי קריאה
 
 כל מודול בפרויקט בנוי **באותה תבנית קבועה**:

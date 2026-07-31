@@ -103,3 +103,4 @@
 | 2026-07-27 | Claude (Miryam) | Field-level READ permissions — סינון customFields ב-GET לפי `view` permission; תיקון `_id:false` על customFields entries | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | Dynamic search/filter/sort ל-Participants — `filters` JSON + `sortBy`/`sortDir` עם aggregation pipeline לשדות דינמיים (לא נבדק עדיין מול DB אמיתי) | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | תיעוד: תיקיית `docs/` עם 11 קבצים — הסבר כללי, מבנה פרויקט, כל מודול לעומק, ומילון מונחים (כולל Docker) | ✅ נדחף |
+| 2026-07-27 | Claude (Miryam) | תיעוד מורחב: 4 קבצים נוספים (12-15) — הסברי קוד שורה-שורה ל-common/auth/users, Docker מורחב, enum-vs-union-type | ✅ נדחף |
