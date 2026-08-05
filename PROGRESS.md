@@ -110,3 +110,4 @@
 | 2026-07-27 | Claude (Miryam) | תיעוד מורחב: 4 קבצים נוספים (12-15) — הסברי קוד שורה-שורה ל-common/auth/users, Docker מורחב, enum-vs-union-type | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | אימות מלא מ-clone נקי (npm install+build+lint+test+e2e) בתיקייה זמנית — סימולציית "מפתחת אחרת"; תוקנה חולשת אבטחה שהתגלתה (brace-expansion, dev dep) | ✅ נדחף |
 | 2026-08-03 | Claude (Miryam) | mustChangePassword אכיפה בפועל (`MustChangePasswordGuard` גלובלי) + Rate limiting (`@nestjs/throttler`: IP-based על login/registration-requests, נעילת חשבון per-username על login) | ✅ נדחף |
+| 2026-08-03 | Claude (Miryam) | תוקנה חולשת אבטחה נוספת שהתגלתה ב-clone נקי (`fast-uri`, הובאה ע"י `@nestjs/throttler`) — `npm audit` מציג 0 חולשות כעת. אומת שוב בזרימת clone-נקי מלאה (install+build+lint+test+e2e) | ✅ נדחף |
