@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -22,6 +23,7 @@ import { ParticipantsModule } from './modules/participants/participants.module';
 import { RegistrationRequestsModule } from './modules/registration-requests/registration-requests.module';
 import { StaffGroupsModule } from './modules/staff-groups/staff-groups.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { MustChangePasswordGuard } from './modules/users/guards/must-change-password.guard';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -31,6 +33,11 @@ import { UsersModule } from './modules/users/users.module';
       load: [configuration],
       validate,
     }),
+    // Baseline rate limiting for every endpoint (spec section 90.1). Login
+    // and self-registration get a stricter override via @Throttle() on
+    // their own routes. In-memory storage — fine for a single instance,
+    // would need a shared store (e.g. Redis) behind a load balancer.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     DatabaseModule,
     CaslModule,
     AuthModule,
@@ -48,8 +55,12 @@ import { UsersModule } from './modules/users/users.module';
   controllers: [AppController],
   providers: [
     AppService,
-    // Order matters: authenticate, then coarse role gate, then CASL entity check. Spec section 64, 93.
+    // Order matters (spec section 64): rate limit first (cheapest, applies
+    // even to unauthenticated requests) -> authenticate -> must-change-password
+    // gate -> coarse role gate -> CASL entity check.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: MustChangePasswordGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: CaslAbilityGuard },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },

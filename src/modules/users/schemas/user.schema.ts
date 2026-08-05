@@ -46,6 +46,19 @@ export class User {
 
   @Prop({ type: Date, default: null })
   deletedAt: Date | null;
+
+  /**
+   * Per-username login lockout (spec section 90.1: "limited per IP and per
+   * username... with backoff/lockout"). IP-side limiting is handled
+   * separately by @nestjs/throttler on the /auth/login route; this half
+   * tracks failed attempts against this specific account regardless of
+   * which IP they came from.
+   */
+  @Prop({ default: 0 })
+  failedLoginAttempts: number;
+
+  @Prop({ type: Date, default: null })
+  lockedUntil: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

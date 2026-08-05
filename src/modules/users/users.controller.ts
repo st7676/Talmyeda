@@ -10,7 +10,11 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { CurrentUser, Roles } from '../../common/decorators';
+import {
+  CurrentUser,
+  Roles,
+  SkipMustChangePasswordCheck,
+} from '../../common/decorators';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
@@ -25,6 +29,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   /** Any authenticated user changes their own password (spec 70.1). Must precede :id routes. */
+  @SkipMustChangePasswordCheck()
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   async changePassword(

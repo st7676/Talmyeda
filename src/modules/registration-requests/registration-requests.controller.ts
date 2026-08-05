@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser, Public, Roles } from '../../common/decorators';
 import { Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
@@ -16,8 +17,12 @@ export class RegistrationRequestsController {
     private readonly registrationRequestsService: RegistrationRequestsService,
   ) {}
 
-  /** POST /registration-requests — public, unauthenticated submitters (spec 13). */
+  /**
+   * POST /registration-requests — public, unauthenticated submitters (spec 13).
+   * Rate-limited per IP to prevent spam submissions (spec 90.1).
+   */
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
   submit(@Body() dto: SubmitRegistrationRequestDto) {
     return this.registrationRequestsService.submit(dto);

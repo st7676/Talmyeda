@@ -14,6 +14,14 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserDocument } from './schemas/user.schema';
 
+/**
+ * Per-username lockout thresholds (spec 90.1: "a fixed number of attempts
+ * per short time window, with backoff/lockout"). Exact numbers aren't
+ * specified in the spec — decided values, documented in PROGRESS.md.
+ */
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -86,6 +94,34 @@ export class UsersService {
     return this.userModel
       .find({ username, status: AccountStatus.Active, isDeleted: false })
       .exec();
+  }
+
+  /** True if this specific account is currently locked out (spec 90.1). */
+  isLocked(user: UserDocument): boolean {
+    return !!user.lockedUntil && user.lockedUntil.getTime() > Date.now();
+  }
+
+  /**
+   * Records a failed login attempt against this specific account. Locks the
+   * account for LOCKOUT_DURATION_MS once MAX_FAILED_ATTEMPTS is reached,
+   * regardless of which IP the attempts came from — this is the "per
+   * username" half of spec 90.1 (IP-side limiting is handled separately by
+   * the ThrottlerGuard on the /auth/login route).
+   */
+  async recordFailedLogin(user: UserDocument): Promise<void> {
+    user.failedLoginAttempts += 1;
+    if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+      user.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+    }
+    await user.save();
+  }
+
+  /** Clears lockout state after a successful login. */
+  async resetFailedLogins(user: UserDocument): Promise<void> {
+    if (user.failedLoginAttempts === 0 && !user.lockedUntil) return;
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = null;
+    await user.save();
   }
 
   findByIdForAuth(id: string): Promise<UserDocument | null> {

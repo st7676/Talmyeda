@@ -8,11 +8,21 @@ import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: { findActiveByUsername: jest.Mock };
+  let usersService: {
+    findActiveByUsername: jest.Mock;
+    isLocked: jest.Mock;
+    recordFailedLogin: jest.Mock;
+    resetFailedLogins: jest.Mock;
+  };
   let jwtService: { signAsync: jest.Mock };
 
   beforeEach(async () => {
-    usersService = { findActiveByUsername: jest.fn() };
+    usersService = {
+      findActiveByUsername: jest.fn(),
+      isLocked: jest.fn().mockReturnValue(false),
+      recordFailedLogin: jest.fn().mockResolvedValue(undefined),
+      resetFailedLogins: jest.fn().mockResolvedValue(undefined),
+    };
     jwtService = { signAsync: jest.fn().mockResolvedValue('signed.jwt.token') };
 
     const moduleRef = await Test.createTestingModule({
@@ -66,5 +76,25 @@ describe('AuthService', () => {
     await expect(
       service.login({ username: 'admin', password: 'wrong-password' }),
     ).rejects.toBeInstanceOf(AppError);
+    expect(usersService.recordFailedLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips a locked account without attempting password verification (spec 90.1)', async () => {
+    const passwordHash = await hashPassword('secret123');
+    usersService.findActiveByUsername.mockResolvedValue([
+      {
+        _id: { toString: () => 'u' },
+        institutionId: null,
+        role: Role.Admin,
+        passwordHash,
+      },
+    ]);
+    usersService.isLocked.mockReturnValue(true);
+
+    // Correct password, but the account is locked — must still fail.
+    await expect(
+      service.login({ username: 'admin', password: 'secret123' }),
+    ).rejects.toBeInstanceOf(AppError);
+    expect(usersService.recordFailedLogin).not.toHaveBeenCalled();
   });
 });

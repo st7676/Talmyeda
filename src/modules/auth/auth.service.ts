@@ -19,6 +19,11 @@ export class AuthService {
    * are only unique *within* an institution. We therefore match against every
    * active user with that username and accept the one whose password verifies.
    * (Recorded as an open decision in PROGRESS.md.)
+   *
+   * Per-username lockout (spec 90.1): a locked candidate is skipped without
+   * attempting the (expensive) bcrypt compare — locked accounts don't count
+   * further failures while already locked. IP-side rate limiting is applied
+   * separately via @Throttle() on the controller route.
    */
   async login(
     dto: LoginDto,
@@ -28,7 +33,10 @@ export class AuthService {
     );
 
     for (const user of candidates) {
+      if (this.usersService.isLocked(user)) continue;
+
       if (await verifyPassword(dto.password, user.passwordHash)) {
+        await this.usersService.resetFailedLogins(user);
         const payload = {
           sub: user._id.toString(),
           institutionId: user.institutionId
@@ -41,9 +49,12 @@ export class AuthService {
           mustChangePassword: user.mustChangePassword,
         };
       }
+
+      await this.usersService.recordFailedLogin(user);
     }
 
-    // Same generic error whether the username or the password was wrong.
+    // Same generic error whether the username was wrong, the password was
+    // wrong, or the account is locked — avoids leaking account state.
     throw AppError.unauthorized(
       'Invalid username or password',
       'INVALID_CREDENTIALS',

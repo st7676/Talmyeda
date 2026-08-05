@@ -26,8 +26,8 @@
 | JwtAuthGuard | 93 | ✅ הושלם | + `@Public()` decorator |
 | Tenant scoping (institutionId מה-JWT) | 44, 92, 93 | ✅ הושלם | `@CurrentUser()` + guard מזריק scope |
 | CASL Ability Factory + Guard (ABAC) | 20-21, 93 | ✅ הושלם | entity-level (`CaslAbilityGuard`+`@CheckAbility`) + context-aware group scoping ב-`ParticipantsService` |
-| mustChangePassword flow | 70.1 | ⬜ טרם התחיל | |
-| Rate limiting (login, registration) | 90.1 | ⬜ טרם התחיל | |
+| mustChangePassword flow | 70.1 | ✅ הושלם | `MustChangePasswordGuard` גלובלי — חוסם כל route (חוץ מ-`@Public`/`@SkipMustChangePasswordCheck`) עד שינוי סיסמה |
+| Rate limiting (login, registration) | 90.1 | ✅ הושלם | `@nestjs/throttler`: ברירת מחדל 100/דקה גלובלי, login 10/דקה + נעילת חשבון per-username, registration-requests 5/דקה |
 
 ## ישויות ליבה (Core Entities & CRUD)
 
@@ -84,12 +84,16 @@
 - **ביצועי סינון READ:** `getViewableKeys` נקרא **פעם אחת** לכל בקשת GET (גם ברשימה שלמה, לא לכל רשומה) כדי למנוע N+1 שאילתות.
 - **ADMIN עוקף את כל בדיקות ה-DynamicValidationPipe פרט למבנה/טיפוס:** ADMIN עדיין עובר בדיקת "unknown key"/"invalid type"/"missing required" (בדיקות שלמות דאטה), אבל לא בדיקת הרשאת edit (יש לו תמיד edit מלא, per סעיף 21 editorial note). קריאות פנימיות (כמו `RegistrationRequestsService.approve`) עוברות עם role=ADMIN כברירת מחדל.
 - **Dynamic filter/sort מומש רק ב-Participants (סעיפים 38-40):** `filters` הוא JSON string `{internalKey:value}` שהופך ל-`$all`/`$elemMatch` (AND בין כמה שדות), נאכף רק אם `searchSettings.filterable=true`. `sortBy`/`sortDir` — אם `sortBy` הוא שדה מערכת (firstName/lastName/createdAt) ממוינים רגיל; אם זה internalKey עם `searchSettings.sortable=true` — עובר ל-aggregation pipeline (`$addFields`+`$let`+`$filter` לחלץ את הערך מתוך מערך ה-customFields, `$sort` לפיו). **חשוב:** אין עדיין סביבת אינטגרציה עם MongoDB אמיתי בפרויקט (סעיף 102 עדיין לא בנוי) — נתיב ה-aggregation נבדק רק ב-build/lint/e2e-boot (שלא נוגע ב-DB), לא הורץ בפועל מול דאטה אמיתי. מומלץ לבדוק ידנית לפני production. Staff ו-Groups לא קיבלו את אותה הרחבה — יש להם רק pagination בסיסי.
+- **npm audit fix (2026-07-27):** תוקנה חולשת אבטחה "high severity" בחבילה עקיפה (`brace-expansion`, תלות של jest/typescript-eslint) שהתגלתה בבדיקת clone נקי. תלות פיתוח בלבד, לא בקוד הייצור. `npm audit fix` פתר בלי לשבור כלום (build/lint/test אומתו אחרי).
+- **mustChangePassword — עלות ביצועים מקובלת (סעיף 70.1):** `MustChangePasswordGuard` קורא ל-DB בכל בקשה מוגנת (לא נשען על השדה ב-JWT, כי סעיף 67 אוסר "frequently changing settings" בטוקן — וזה בדיוק שדה כזה: משתמש שממש שינה סיסמה חייב "להשתחרר" מיידית, לא אחרי שה-cache יפוג). Trade-off מתועד: תקינות מיידית > ביצועים.
+- **נעילת חשבון per-username (סעיף 90.1):** נוספו שדות `failedLoginAttempts`/`lockedUntil` ל-`User`. לאחר 5 ניסיונות כושלים על אותו חשבון — ננעל ל-15 דקות, ללא קשר לכתובת ה-IP. המספרים (5 ניסיונות, 15 דקות) הם ערכים שנבחרו — האפיון לא מציין מספרים מדויקים. חשבון נעול מדולג ישירות (לא מנסים bcrypt.compare בכלל) — לא מגדילים את מונה הכשלונות בזמן שהחשבון כבר נעול.
+- **Rate limiting IP-based — אחסון בזיכרון (`@nestjs/throttler` ברירת מחדל):** מתאים לאינסטנס שרת בודד. אם יהיה scale-out (כמה אינסטנסים מאחורי load balancer), יהיה צריך storage משותף (Redis) כדי שהמגבלה תיאכף נכון על פני כל האינסטנסים.
 
 ## מה הבא בתור (Next up)
 
-1. mustChangePassword אכיפה בפועל (guard שחוסם פעולות עד שינוי סיסמה) + Rate limiting (90.1).
-2. Docker, logging מובנה, טסטים (unit/integration/security) — סעיפים 96, 101, 102. **בפרט:** אין עדיין שום טסט אמיתי מול MongoDB — כדאי שזה יהיה בעדיפות גבוהה כדי לאמת את ה-aggregation pipeline של דירוג דינמי ואת שאר לוגיקת ה-DB.
-3. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה).
+1. Docker, logging מובנה, טסטים (unit/integration/security) — סעיפים 96, 101, 102. **בפרט:** אין עדיין שום טסט אמיתי מול MongoDB — כדאי שזה יהיה בעדיפות גבוהה כדי לאמת את ה-aggregation pipeline של דירוג דינמי ואת שאר לוגיקת ה-DB.
+2. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה).
+3. Field-level permissions על RegistrationRequest (אם רלוונטי) ו-Audit Log (סעיף 97, מוגדר עתידי ולא v1 — לוודא שזה אכן לא נדרש עדיין).
 
 ## יומן דחיפות (Session Log)
 
@@ -104,3 +108,5 @@
 | 2026-07-27 | Claude (Miryam) | Dynamic search/filter/sort ל-Participants — `filters` JSON + `sortBy`/`sortDir` עם aggregation pipeline לשדות דינמיים (לא נבדק עדיין מול DB אמיתי) | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | תיעוד: תיקיית `docs/` עם 11 קבצים — הסבר כללי, מבנה פרויקט, כל מודול לעומק, ומילון מונחים (כולל Docker) | ✅ נדחף |
 | 2026-07-27 | Claude (Miryam) | תיעוד מורחב: 4 קבצים נוספים (12-15) — הסברי קוד שורה-שורה ל-common/auth/users, Docker מורחב, enum-vs-union-type | ✅ נדחף |
+| 2026-07-27 | Claude (Miryam) | אימות מלא מ-clone נקי (npm install+build+lint+test+e2e) בתיקייה זמנית — סימולציית "מפתחת אחרת"; תוקנה חולשת אבטחה שהתגלתה (brace-expansion, dev dep) | ✅ נדחף |
+| 2026-08-03 | Claude (Miryam) | mustChangePassword אכיפה בפועל (`MustChangePasswordGuard` גלובלי) + Rate limiting (`@nestjs/throttler`: IP-based על login/registration-requests, נעילת חשבון per-username על login) | ✅ נדחף |
