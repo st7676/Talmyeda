@@ -45,7 +45,13 @@ description: >-
    npm run build
    npm run lint
    npm test
+   npm run test:integration   # אם נגעתם ב-schema/service/query — חובה!
    ```
+   `npm test` הוא unit tests עם mocks בלבד — **לא** יתפוס באגים בשאילתות/סכימות
+   אמיתיות (ראו הבאג הקריטי ב-PROGRESS.md, 2026-08-10, שנתפס רק דרך בדיקה
+   מול MongoDB אמיתי). `test:integration` מריץ MongoDB אמיתי בזיכרון
+   (`mongodb-memory-server`) — **חובה** להריץ לפני כל שינוי שנוגע ב-schema,
+   ב-service שמריץ שאילתות, או בקשרי-מפתח בין ישויות.
 3. עשו קומיט **תיאורי** (ראו פורמט בסעיף 5) ואז `git push`.
 4. אחרי הדחיפה — עדכנו את מה הבא בתור ב-PROGRESS.md.
 
@@ -83,7 +89,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 - **סכימה דינמית:** `customFields` הוא תמיד מערך `[{ k, v }]` (Attribute Pattern, סעיף 35). לעולם לא אובייקט מקונן.
 - **סודות לא נכנסים לקוד.** משתני סביבה בלבד (`.env`, לא בגיט).
 - אם החלטה עסקית לא ברורה מהאפיון — רשמו אותה כ"החלטה פתוחה" ב-PROGRESS.md ושאלו, אל תמציאו.
+- **שדות ObjectId ב-Mongoose:** תמיד `@Prop({ type: SchemaTypes.ObjectId })`, לעולם לא `type: Types.ObjectId` (ראו CLAUDE.md ו-PROGRESS.md — באג קריטי אמיתי מהסוג הזה כבר קרה כאן).
 
 ---
 
-**סדר הפעולות בכל סשן, בקצרה:** קראו PROGRESS.md → בחרו משימה → סמנו `🔧 בעבודה` → בנו → build+lint+test → עדכנו ל-`✅` → commit+push. ואם הגעתם ל-90% טוקנים — עצרו, תעדו `⏸️ חלקי`, ודחפו.
+**סדר הפעולות בכל סשן, בקצרה:** קראו PROGRESS.md → בחרו משימה → סמנו `🔧 בעבודה` → בנו → build+lint+test(+test:integration אם נגעתם ב-DB) → עדכנו ל-`✅` → commit+push. ואם הגעתם ל-90% טוקנים — עצרו, תעדו `⏸️ חלקי`, ודחפו.

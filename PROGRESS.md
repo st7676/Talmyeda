@@ -62,7 +62,7 @@
 | Pagination אחיד | 86, 98.1 | ✅ הושלם | `PaginationQueryDto` + `PaginatedResult<T>` בכל ה-list endpoints |
 | Logging | 96 | ⬜ טרם התחיל | |
 | Docker (backend + mongo) | 101 | ✅ הושלם | `Dockerfile` (multi-stage build), `docker-compose.yml` (backend+mongo+healthcheck+volume), `.dockerignore`. **אומת בפועל** — `docker compose up` הורץ עד הסוף מול MongoDB אמיתי (ראו סעיף הבאג הקריטי למטה) |
-| טסטים (unit/integration/security) | 102 | ⬜ טרם התחיל | ה-unit tests הבסיסיים קיימים; **בדיקה ידנית מקיפה** בוצעה מול DB אמיתי דרך Docker (register→login→CRUD→cross-collection filter) — עדיין אין test suite אוטומטי שרץ מול Mongo (integration tests) |
+| טסטים (unit/integration/security) | 102 | ✅ הושלם (unit+integration) | `npm run test:integration` — 5 טסטים אוטומטיים מול MongoDB אמיתי (in-memory, לא mock) דרך `mongodb-memory-server`. **אומת שהם באמת תופסים רגרסיות:** הוחזר הבאג הקריטי זמנית והטסטים נכשלו בדיוק כצפוי, לפני שהוחזר התיקון. Security tests (סעיף 102.3, tenant isolation/unauthorized access) עדיין לא נבנו בנפרד |
 
 ---
 
@@ -110,6 +110,13 @@ Institution↔InstitutionSettings.
 `participant.schema.ts`, `registration-request.schema.ts`, `staff-group.schema.ts`,
 `staff.schema.ts`, `user.schema.ts`.
 
+**עדכון (2026-08-10, אחר כך): הבדיקה הידנית הזו הפכה לטסטים אוטומטיים** —
+ראו `test/integration/`. הרצתי ניסוי מכוון: **החזרתי את הבאג זמנית**
+(`type: Types.ObjectId` בחזרה) והרצתי רק את `institution-settings.integration-spec.ts`
+— שני מתוך שלושה טסטים נכשלו **בדיוק** באותם אופנים שנצפו ידנית
+(`settings: null`, `PUT` מחזיר 404). זה מוכיח שהטסטים באמת תופסים את
+הבאג הזה ולא רק "עוברים במקרה". אחרי זה שוחזר התיקון וכל הטסטים חזרו לירוק.
+
 ---
 
 ## החלטות פתוחות / שאלות לבעל המוצר
@@ -134,14 +141,16 @@ Institution↔InstitutionSettings.
 - **mustChangePassword — עלות ביצועים מקובלת (סעיף 70.1):** `MustChangePasswordGuard` קורא ל-DB בכל בקשה מוגנת (לא נשען על השדה ב-JWT, כי סעיף 67 אוסר "frequently changing settings" בטוקן — וזה בדיוק שדה כזה: משתמש שממש שינה סיסמה חייב "להשתחרר" מיידית, לא אחרי שה-cache יפוג). Trade-off מתועד: תקינות מיידית > ביצועים.
 - **נעילת חשבון per-username (סעיף 90.1):** נוספו שדות `failedLoginAttempts`/`lockedUntil` ל-`User`. לאחר 5 ניסיונות כושלים על אותו חשבון — ננעל ל-15 דקות, ללא קשר לכתובת ה-IP. המספרים (5 ניסיונות, 15 דקות) הם ערכים שנבחרו — האפיון לא מציין מספרים מדויקים. חשבון נעול מדולג ישירות (לא מנסים bcrypt.compare בכלל) — לא מגדילים את מונה הכשלונות בזמן שהחשבון כבר נעול.
 - **Rate limiting IP-based — אחסון בזיכרון (`@nestjs/throttler` ברירת מחדל):** מתאים לאינסטנס שרת בודד. אם יהיה scale-out (כמה אינסטנסים מאחורי load balancer), יהיה צריך storage משותף (Redis) כדי שהמגבלה תיאכף נכון על פני כל האינסטנסים.
+- **Integration tests עם `mongodb-memory-server` ולא Docker (סעיף 102):** נבחר במכוון — מריץ MongoDB **אמיתי** (לא mock) בזיכרון, ללא תלות ב-Docker daemon בזמן ריצת הטסטים. עובד זהה מקומית וב-CI, בלי הבעיות שנתקלנו בהן עם Docker Desktop. `test/integration/setup-mongo.ts` מפעיל/מכבה, `test/integration/bootstrap-app.ts` בונה אפליקציית Nest מלאה (אותו ValidationPipe כמו `main.ts`), `test/integration/http-helpers.ts` נותן טיפוס בטוח ל-`.body.data` של supertest. הרצה: `npm run test:integration`. **כרגע מכסה:** רגרסיית הבאג הקריטי (Institution↔Settings) ושרשרת Group+Participant+ParticipantGroup. **לא מכוסה עדיין:** ה-aggregation pipeline של מיון דינמי (FieldDefinition-based sort), security tests (tenant isolation בין שני מוסדות, ניסיונות גישה לא מורשית).
 
 ## מה הבא בתור (Next up)
 
-1. **טסטים אוטומטיים אמיתיים מול MongoDB (סעיף 102)** — עכשיו שיש Docker Compose, אפשר סוף-סוף לכתוב integration tests שרצים מול Mongo אמיתי (למשל ב-CI, מריצים `docker compose up mongo` לפני `npm run test:e2e`). זה גם יתפוס אוטומטית רגרסיות מהסוג שתפסנו הרגע ידנית.
-2. לוודא שאין עוד מופעים של הבאג הקריטי (type:Types.ObjectId) — כדאי סקירה נוספת/lint rule מותאם שמונע רגרסיה (למשל ESLint rule מותאם, או בדיקה אוטומטית ב-CI).
-3. Logging מובנה (סעיף 96).
-4. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה).
-5. Field-level permissions על RegistrationRequest (אם רלוונטי) ו-Audit Log (סעיף 97, מוגדר עתידי ולא v1 — לוודא שזה אכן לא נדרש עדיין).
+1. Security integration tests (סעיף 102.3) — שני מוסדות, לוודא שמוסד A לעולם לא רואה דאטה של מוסד B (tenant isolation), ושתפקידים לא-מורשים נחסמים.
+2. הרחבת integration tests לכסות את ה-aggregation pipeline של מיון דינמי (FieldDefinition sortable) — עדיין לא נבדק אוטומטית.
+3. לוודא שאין עוד מופעים של הבאג הקריטי (type:Types.ObjectId) במקומות שלא נבדקו — סקירה נוספת/lint rule מותאם שמונע רגרסיה.
+4. Logging מובנה (סעיף 96).
+5. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה).
+6. Field-level permissions על RegistrationRequest (אם רלוונטי) ו-Audit Log (סעיף 97, מוגדר עתידי ולא v1 — לוודא שזה אכן לא נדרש עדיין).
 
 ## יומן דחיפות (Session Log)
 
@@ -160,3 +169,4 @@ Institution↔InstitutionSettings.
 | 2026-08-03 | Claude (Miryam) | mustChangePassword אכיפה בפועל (`MustChangePasswordGuard` גלובלי) + Rate limiting (`@nestjs/throttler`: IP-based על login/registration-requests, נעילת חשבון per-username על login) | ✅ נדחף |
 | 2026-08-03 | Claude (Miryam) | תוקנה חולשת אבטחה נוספת שהתגלתה ב-clone נקי (`fast-uri`, הובאה ע"י `@nestjs/throttler`) — `npm audit` מציג 0 חולשות כעת. אומת שוב בזרימת clone-נקי מלאה (install+build+lint+test+e2e) | ✅ נדחף |
 | 2026-08-10 | Claude (Miryam) | Docker (Dockerfile+docker-compose+dockerignore), הורץ בפועל עם `docker compose up` מול MongoDB אמיתי. **תפס באג קריטי** ב-10 קבצי schema (`type:Types.ObjectId` → `Mixed` type, לא `ObjectId`) — תוקן ל-`SchemaTypes.ObjectId`, אומת מחדש מקצה-לקצה (register/login/CRUD/cross-collection filter) | ✅ נדחף |
+| 2026-08-10 | Claude (Miryam) | Integration tests אוטומטיים (`test/integration/`, `mongodb-memory-server`) — 5 טסטים מול Mongo אמיתי; אומת שהם תופסים רגרסיות ע"י החזרת הבאג הקריטי זמנית ובדיקה שהטסטים נכשלים כצפוי | ✅ נדחף |

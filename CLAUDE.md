@@ -23,9 +23,17 @@ Talmyeda — פלטפורמת SaaS גנרית, רב-דיירותית (multi-tena
 - **סכימה דינמית:** `customFields` תמיד `[{ k, v }]` (Attribute Pattern), לעולם לא אובייקט מקונן. (אפיון 35)
 - **אל תשברו קיים / הימנעו ממיגרציות הרסניות.** (אפיון 2.2, 62, 104)
 - **סודות במשתני סביבה בלבד**, לא בקוד/גיט.
+- **שדות ObjectId ב-Mongoose:** תמיד `@Prop({ type: SchemaTypes.ObjectId, ... })`
+  (מ-`import { SchemaTypes } from 'mongoose'`), **לעולם לא** `type: Types.ObjectId`
+  — זו מחלקת ה-BSON עצמה, לא ה-SchemaType, וגורמת ל-Mongoose להגדיר את השדה
+  כ-`Mixed` ולאבד cast אוטומטי string↔ObjectId (באג קריטי שנתפס ותוקן ב-2026-08-10,
+  ראו PROGRESS.md). `Types.ObjectId` עדיין תקין כטיפוס TypeScript (`institutionId: Types.ObjectId | null`).
 
 ## מבנה ופקודות
 
 - מבנה מודול: `Controller · Service · DTO · Schema · Guards · Validators`. לוגיקה עסקית ב-Service, לא ב-Controller. (אפיון 87)
 - `npm run start:dev` · `npm run build` · `npm run lint` · `npm test`
+- `npm run test:e2e` — בדיקת "עולה בלי לקרוס" (בלי DB אמיתי)
+- `npm run test:integration` — טסטים אמיתיים מול MongoDB (`mongodb-memory-server`, לא Docker) — **חובה** להריץ לפני push של שינויים בסכימות/שאילתות
+- `docker compose up` — מריץ שרת+Mongo אמיתיים לבדיקה ידנית/manual QA
 - דורש `.env` (ראו `.env.example`): `MONGODB_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `PORT`, `NODE_ENV`.
