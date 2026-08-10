@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type ParticipantGroupDocument = HydratedDocument<ParticipantGroup>;
 
@@ -12,7 +12,7 @@ export type ParticipantGroupDocument = HydratedDocument<ParticipantGroup>;
 @Schema({ timestamps: true, collection: 'participant_groups' })
 export class ParticipantGroup {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Institution',
     required: true,
     index: true,
@@ -20,14 +20,19 @@ export class ParticipantGroup {
   institutionId: Types.ObjectId;
 
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Participant',
     required: true,
     index: true,
   })
   participantId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Group', required: true, index: true })
+  @Prop({
+    type: SchemaTypes.ObjectId,
+    ref: 'Group',
+    required: true,
+    index: true,
+  })
   groupId: Types.ObjectId;
 
   @Prop({ type: Date, required: true })

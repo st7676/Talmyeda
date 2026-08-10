@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 import { AccountStatus, Role } from '../../../common/enums';
 
 export type UserDocument = HydratedDocument<User>;
@@ -12,7 +12,7 @@ export type UserDocument = HydratedDocument<User>;
 @Schema({ timestamps: true, collection: 'users' })
 export class User {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Institution',
     default: null,
     index: true,
@@ -28,10 +28,10 @@ export class User {
   @Prop({ type: String, enum: Role, required: true })
   role: Role;
 
-  @Prop({ type: Types.ObjectId, ref: 'Participant', default: null })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Participant', default: null })
   participantId: Types.ObjectId | null;
 
-  @Prop({ type: Types.ObjectId, ref: 'Staff', default: null })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Staff', default: null })
   staffId: Types.ObjectId | null;
 
   @Prop({ type: String, enum: AccountStatus, default: AccountStatus.Active })

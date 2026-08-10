@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 import { FieldEntityType, FieldType } from '../../../common/enums';
 
 export type FieldDefinitionDocument = HydratedDocument<FieldDefinition>;
@@ -56,7 +56,7 @@ export class SearchSettings {
 @Schema({ timestamps: true, collection: 'field_definitions' })
 export class FieldDefinition {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Institution',
     required: true,
     index: true,

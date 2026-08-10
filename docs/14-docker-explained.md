@@ -129,7 +129,15 @@ docker compose up
 
 ## מצב נוכחי בפרויקט
 
-נכון לכתיבת מסמך זה, **אין עדיין** `Dockerfile`/`docker-compose.yml` בפרויקט — זה מתועד כפריט "טרם התחיל" ב-[`PROGRESS.md`](../PROGRESS.md) תחת סעיף 101 באפיון.
+`Dockerfile` ו-`docker-compose.yml` **קיימים** בשורש הריפו (סעיף 101 הושלם — ראו [`PROGRESS.md`](../PROGRESS.md)):
+
+- **`Dockerfile`** — multi-stage build: שלב `builder` מתקין dependencies מלאים ומריץ `npm run build`; שלב `production` מתקין רק dependencies של production (`npm ci --omit=dev`) ומעתיק את `dist/` הבנוי משלב ה-builder. כך ה-image הסופי לא סוחב את כל קוד המקור/TypeScript וכלי הפיתוח — קטן ומהיר יותר.
+- **`docker-compose.yml`** — מריץ שני services: `backend` (בנוי מה-Dockerfile) ו-`mongo` (image רשמי `mongo:7`), עם volume בשם `mongo_data` ששומר את הדאטה בין הרצות, ו-healthcheck על ה-Mongo כדי שהבקאנד יחכה שהוא **באמת** מוכן (לא רק ש-container "רץ") לפני שהוא מתחיל.
+- **`.dockerignore`** — מונע העתקת `node_modules`, `dist`, `.git`, `.env` וכו' לתוך ה-build context (מהיר יותר, ובטוח יותר — לא מעתיקים סודות בטעות).
+
+הרצה: `docker compose up` (או `-d` ברקע) מריצה את שניהם מחוברים. ה-`JWT_SECRET`/`JWT_EXPIRES_IN` נלקחים ממשתני סביבה של המארח אם קיימים (`${JWT_SECRET:-...}`), אחרת ברירת מחדל לפיתוח בלבד — **לא** להשתמש בברירת המחדל בפרודקשן.
+
+**אומת בפועל (2026-08-10):** `docker compose up` הורץ עד הסוף מול MongoDB אמיתי — לא רק סקירת קוד. זו הפעם הראשונה שהאפליקציה נבדקה מקצה-לקצה מול DB אמיתי, וזה תפס [באג קריטי](../PROGRESS.md) בהגדרת שדות ObjectId שהיה קיים בכל הפרויקט. שווה לזכור את זה כדוגמה קונקרטית לכך שסעיף 101 (Docker) וסעיף 102 (טסטים) קשורים זה בזה — Docker הוא מה שהופך טסטים אמיתיים מול DB לאפשריים בכלל.
 
 ---
 חזרה ל-[`README.md`](README.md).

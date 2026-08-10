@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type StaffGroupDocument = HydratedDocument<StaffGroup>;
 
@@ -10,17 +10,27 @@ export type StaffGroupDocument = HydratedDocument<StaffGroup>;
 @Schema({ timestamps: true, collection: 'staff_groups' })
 export class StaffGroup {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Institution',
     required: true,
     index: true,
   })
   institutionId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Staff', required: true, index: true })
+  @Prop({
+    type: SchemaTypes.ObjectId,
+    ref: 'Staff',
+    required: true,
+    index: true,
+  })
   staffId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Group', required: true, index: true })
+  @Prop({
+    type: SchemaTypes.ObjectId,
+    ref: 'Group',
+    required: true,
+    index: true,
+  })
   groupId: Types.ObjectId;
 
   @Prop({ type: String, trim: true, default: null })

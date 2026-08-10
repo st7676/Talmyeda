@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type FieldOptionDocument = HydratedDocument<FieldOption>;
 
@@ -12,7 +12,7 @@ export type FieldOptionDocument = HydratedDocument<FieldOption>;
 @Schema({ timestamps: true, collection: 'field_options' })
 export class FieldOption {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'FieldDefinition',
     required: true,
     index: true,
@@ -20,7 +20,7 @@ export class FieldOption {
   fieldId: Types.ObjectId;
 
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Institution',
     required: true,
     index: true,

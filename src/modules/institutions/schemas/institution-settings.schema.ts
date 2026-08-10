@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type InstitutionSettingsDocument = HydratedDocument<InstitutionSettings>;
 
@@ -14,7 +14,7 @@ export enum ParticipantUserMode {
 @Schema({ timestamps: true, collection: 'institution_settings' })
 export class InstitutionSettings {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Institution',
     required: true,
     unique: true,

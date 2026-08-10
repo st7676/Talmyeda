@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type ParticipantDocument = HydratedDocument<Participant>;
 
@@ -18,7 +18,7 @@ export class CustomFieldEntry {
 @Schema({ timestamps: true, collection: 'participants' })
 export class Participant {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Institution',
     required: true,
     index: true,

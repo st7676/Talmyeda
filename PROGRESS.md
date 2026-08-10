@@ -61,8 +61,54 @@
 | Soft delete (isDeleted/deletedAt) | 59 | ✅ הושלם | User, Institution, Participant, Staff, Group |
 | Pagination אחיד | 86, 98.1 | ✅ הושלם | `PaginationQueryDto` + `PaginatedResult<T>` בכל ה-list endpoints |
 | Logging | 96 | ⬜ טרם התחיל | |
-| Docker (backend + mongo) | 101 | ⬜ טרם התחיל | |
-| טסטים (unit/integration/security) | 102 | ⬜ טרם התחיל | |
+| Docker (backend + mongo) | 101 | ✅ הושלם | `Dockerfile` (multi-stage build), `docker-compose.yml` (backend+mongo+healthcheck+volume), `.dockerignore`. **אומת בפועל** — `docker compose up` הורץ עד הסוף מול MongoDB אמיתי (ראו סעיף הבאג הקריטי למטה) |
+| טסטים (unit/integration/security) | 102 | ⬜ טרם התחיל | ה-unit tests הבסיסיים קיימים; **בדיקה ידנית מקיפה** בוצעה מול DB אמיתי דרך Docker (register→login→CRUD→cross-collection filter) — עדיין אין test suite אוטומטי שרץ מול Mongo (integration tests) |
+
+---
+
+## 🚨 באג קריטי שנמצא ותוקן (2026-08-10)
+
+**נמצא רק דרך בדיקה אמיתית מול MongoDB (Docker) — בדיוק הסיבה שסעיף 102 חשוב.**
+
+**מה היה שבור:** בכל 10 קבצי ה-schema בפרויקט, שדות ObjectId (`institutionId`,
+`participantId`, `staffId`, `groupId`, `fieldId` וכו') הוגדרו כך:
+```ts
+import { Types } from 'mongoose';
+@Prop({ type: Types.ObjectId, ref: 'Institution', ... })
+```
+`Types.ObjectId` הוא מחלקת ה-**BSON ObjectId עצמה** (ליצירת instance), **לא**
+`Schema.Types.ObjectId`/`SchemaTypes.ObjectId` שזה מה ש-Mongoose צריך כדי לדעת
+את **סוג השדה בסכימה**. Mongoose לא זיהה את זה, הגדיר את השדה כ-`Mixed`, ואיבד
+את ה-cast האוטומטי string↔ObjectId.
+
+**איך זה התבטא בפועל:** שדה שנכתב עם string (למשל institutionId שמגיע מ-JWT)
+נשמר כ-string; שדה שנכתב עם ObjectId אמיתי (כמו `institution._id` בקוד פנימי)
+נשמר כ-ObjectId. חוסר עקביות שקט. **תפסתי את זה** כי `GET /institutions/me`
+החזיר `settings: null` על אף שהמסמך קיים ב-DB — כי `register()` יצר את
+ה-settings עם `institution._id` (ObjectId אמיתי), אבל `getMe()`/`getSettings()`
+שאלו עם `institutionId` string מה-JWT — type mismatch, אפס תוצאות.
+
+**למה זה לא נתפס קודם:** רוב המודולים (Participant, Group וכו') כתבו **וגם**
+קראו עם string בעקביות (שניהם מגיעים מ-JWT), אז זה "עבד במקרה". זה נשבר רק
+כשמסלול אחד כתב ObjectId אמיתי ומסלול אחר קרא עם string — בדיוק המקרה של
+Institution↔InstitutionSettings.
+
+**התיקון:** בכל 10 הקבצים, `type: Types.ObjectId` → `type: SchemaTypes.ObjectId`
+(עם `import { SchemaTypes } from 'mongoose'` — לא `Schema.Types` כי `Schema`
+כבר מיובא מ-`@nestjs/mongoose` בכל קובץ ויוצר התנגשות שמות). `Types.ObjectId`
+עדיין נשאר בשימוש כטיפוס TypeScript (`institutionId: Types.ObjectId | null`)
+— זה תקין ולא קשור לבאג.
+
+**אומת אחרי התיקון (מול Mongo אמיתי דרך Docker, DB נקי מאפס):**
+- `register()` → `login()` → `GET /institutions/me` מחזיר `settings` תקין (לא null)
+- `PUT /institutions/settings` עובד (קודם היה מחזיר 404)
+- `institutionId` מאוחסן כ-BSON ObjectId אמיתי (נבדק ישירות ב-mongosh: `instanceof ObjectId === true`)
+- שרשרת מלאה: Group + Participant + ParticipantGroup + סינון `?groupId=` (שאילתה חוצת-collections) — עובד נכון
+
+**קבצים שתוקנו:** `field-definition.schema.ts`, `field-option.schema.ts`,
+`group.schema.ts`, `institution-settings.schema.ts`, `participant-group.schema.ts`,
+`participant.schema.ts`, `registration-request.schema.ts`, `staff-group.schema.ts`,
+`staff.schema.ts`, `user.schema.ts`.
 
 ---
 
@@ -91,9 +137,11 @@
 
 ## מה הבא בתור (Next up)
 
-1. Docker, logging מובנה, טסטים (unit/integration/security) — סעיפים 96, 101, 102. **בפרט:** אין עדיין שום טסט אמיתי מול MongoDB — כדאי שזה יהיה בעדיפות גבוהה כדי לאמת את ה-aggregation pipeline של דירוג דינמי ואת שאר לוגיקת ה-DB.
-2. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה).
-3. Field-level permissions על RegistrationRequest (אם רלוונטי) ו-Audit Log (סעיף 97, מוגדר עתידי ולא v1 — לוודא שזה אכן לא נדרש עדיין).
+1. **טסטים אוטומטיים אמיתיים מול MongoDB (סעיף 102)** — עכשיו שיש Docker Compose, אפשר סוף-סוף לכתוב integration tests שרצים מול Mongo אמיתי (למשל ב-CI, מריצים `docker compose up mongo` לפני `npm run test:e2e`). זה גם יתפוס אוטומטית רגרסיות מהסוג שתפסנו הרגע ידנית.
+2. לוודא שאין עוד מופעים של הבאג הקריטי (type:Types.ObjectId) — כדאי סקירה נוספת/lint rule מותאם שמונע רגרסיה (למשל ESLint rule מותאם, או בדיקה אוטומטית ב-CI).
+3. Logging מובנה (סעיף 96).
+4. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה).
+5. Field-level permissions על RegistrationRequest (אם רלוונטי) ו-Audit Log (סעיף 97, מוגדר עתידי ולא v1 — לוודא שזה אכן לא נדרש עדיין).
 
 ## יומן דחיפות (Session Log)
 
@@ -111,3 +159,4 @@
 | 2026-07-27 | Claude (Miryam) | אימות מלא מ-clone נקי (npm install+build+lint+test+e2e) בתיקייה זמנית — סימולציית "מפתחת אחרת"; תוקנה חולשת אבטחה שהתגלתה (brace-expansion, dev dep) | ✅ נדחף |
 | 2026-08-03 | Claude (Miryam) | mustChangePassword אכיפה בפועל (`MustChangePasswordGuard` גלובלי) + Rate limiting (`@nestjs/throttler`: IP-based על login/registration-requests, נעילת חשבון per-username על login) | ✅ נדחף |
 | 2026-08-03 | Claude (Miryam) | תוקנה חולשת אבטחה נוספת שהתגלתה ב-clone נקי (`fast-uri`, הובאה ע"י `@nestjs/throttler`) — `npm audit` מציג 0 חולשות כעת. אומת שוב בזרימת clone-נקי מלאה (install+build+lint+test+e2e) | ✅ נדחף |
+| 2026-08-10 | Claude (Miryam) | Docker (Dockerfile+docker-compose+dockerignore), הורץ בפועל עם `docker compose up` מול MongoDB אמיתי. **תפס באג קריטי** ב-10 קבצי schema (`type:Types.ObjectId` → `Mixed` type, לא `ObjectId`) — תוקן ל-`SchemaTypes.ObjectId`, אומת מחדש מקצה-לקצה (register/login/CRUD/cross-collection filter) | ✅ נדחף |

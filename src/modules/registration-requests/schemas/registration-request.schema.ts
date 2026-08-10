@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type RegistrationRequestDocument = HydratedDocument<RegistrationRequest>;
 
@@ -39,7 +39,7 @@ export class RequestedData {
 @Schema({ timestamps: true, collection: 'registration_requests' })
 export class RegistrationRequest {
   @Prop({
-    type: Types.ObjectId,
+    type: SchemaTypes.ObjectId,
     ref: 'Institution',
     required: true,
     index: true,
