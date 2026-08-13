@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AppError } from '../../common/errors/app-error';
 import { verifyPassword } from '../../common/utils/password.util';
@@ -7,6 +7,8 @@ import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -24,6 +26,11 @@ export class AuthService {
    * attempting the (expensive) bcrypt compare — locked accounts don't count
    * further failures while already locked. IP-side rate limiting is applied
    * separately via @Throttle() on the controller route.
+   *
+   * Logging (spec 96 — "Log... Failed authentication attempts"): username
+   * only, never the password, and never which specific reason it failed for
+   * (wrong username vs wrong password vs locked) — same principle as the
+   * generic error message below, so logs can't be used to enumerate accounts.
    */
   async login(
     dto: LoginDto,
@@ -44,6 +51,9 @@ export class AuthService {
             : null,
           role: user.role,
         };
+        this.logger.log(
+          `Successful login: username=${dto.username} userId=${user._id.toString()} role=${user.role}`,
+        );
         return {
           accessToken: await this.jwtService.signAsync(payload),
           mustChangePassword: user.mustChangePassword,
@@ -52,6 +62,8 @@ export class AuthService {
 
       await this.usersService.recordFailedLogin(user);
     }
+
+    this.logger.warn(`Failed login attempt: username=${dto.username}`);
 
     // Same generic error whether the username was wrong, the password was
     // wrong, or the account is locked — avoids leaking account state.
