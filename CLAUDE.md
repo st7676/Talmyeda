@@ -31,7 +31,11 @@ Talmyeda — פלטפורמת SaaS גנרית, רב-דיירותית (multi-tena
 - **`.aggregate()` לא עובר cast אוטומטי כמו `.find()`:** כל ObjectId (כולל `institutionId`)
   שנכנס ל-`$match`/שלב אחר בתוך pipeline חייב המרה ידנית ל-`new Types.ObjectId(...)` מראש —
   אחרת string לא יתאים ל-ObjectId מאוחסן ותקבלו 0 תוצאות בשקט (באג נתפס ותוקן ב-2026-08-13,
-  ראו PROGRESS.md, `ParticipantsService.findSortedByDynamicField`).
+  ראו PROGRESS.md, `ParticipantsService.findSortedByDynamicField`, כיום ב-`DynamicQueryService`).
+- **מחלקה מקוננת ב-`@Prop({ type: SomeClass })` חייבת `@Schema()` + `SchemaFactory.createForClass()`,
+  וה-`type:` בהורה חייב להצביע על ה-Schema שנוצר (`SomeClassSchema`) — לא על המחלקה עצמה.**
+  בלי זה Mongoose נופל בשקט ל-`Mixed`, מאבד את כל ברירות המחדל/ה-validation של אותו path
+  (באג קריטי שלישי, נתפס ותוקן ב-2026-08-13, ראו PROGRESS.md, `field-definition.schema.ts`).
 
 ## מבנה ופקודות
 

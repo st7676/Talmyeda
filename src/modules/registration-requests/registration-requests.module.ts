@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { DynamicFieldsModule } from '../dynamic-fields/dynamic-fields.module';
 import { InstitutionsModule } from '../institutions/institutions.module';
 import { ParticipantsModule } from '../participants/participants.module';
 import { UsersModule } from '../users/users.module';
@@ -18,6 +19,7 @@ import {
     InstitutionsModule,
     ParticipantsModule,
     UsersModule,
+    DynamicFieldsModule,
   ],
   controllers: [RegistrationRequestsController],
   providers: [RegistrationRequestsService],

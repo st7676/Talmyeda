@@ -50,7 +50,7 @@
 | FieldDefinition CRUD | 25-32, 80-82 | ✅ הושלם | internalKey אוטומטי; type-change ו-required-change עוברים בדיקות בטיחות מול דאטה קיים לפני יישום |
 | FieldOption CRUD (isActive) | 33-34, 83 | ✅ הושלם | disable (לא מחיקה פיזית) + institutionId denormalized |
 | customFields Attribute Pattern `[{k,v}]` | 35 | ✅ הושלם | canonical בכל הישויות (Participant/Staff/Group/RegistrationRequest) |
-| DynamicValidationPipe (type/required/unknown) | 36-37, 94.3 | ✅ הושלם | `DynamicFieldsValidatorService` — נאכף ב-create/update של Participant/Staff/Group |
+| DynamicValidationPipe (type/required/unknown) | 36-37, 94.3 | ✅ הושלם | `DynamicFieldsValidatorService` — נאכף ב-create/update של Participant/Staff/Group, וגם ב-`submit()` הציבורי של RegistrationRequest (role=Participant, נוסף 2026-08-13) |
 | Dynamic search / filter / sort | 38-40, 85 | ✅ הושלם (Participants+Staff+Groups) | `?filters={"field_x":"y"}` (רק filterable), `?sortBy=&sortDir=` (רק sortable; שדה דינמי → aggregation pipeline). לוגיקה משותפת חולצה ל-`DynamicQueryService` (`dynamic-fields/dynamic-query.service.ts`) כדי לא לשכפל את כלל ה-cast הידני ל-ObjectId ב-aggregate; Staff ו-Groups קיבלו `QueryStaffDto`/`QueryGroupsDto` (filters/sortBy/sortDir, ללא search/groupId שספציפיים ל-Participants) |
 | אינדקסים מורכבים ל-customFields | 60-61 | ✅ הושלם | `{institutionId, customFields.k, customFields.v}` בכל schema רלוונטי |
 
@@ -62,7 +62,7 @@
 | Pagination אחיד | 86, 98.1 | ✅ הושלם | `PaginationQueryDto` + `PaginatedResult<T>` בכל ה-list endpoints |
 | Logging | 96 | ✅ הושלם | `LoggingInterceptor` גלובלי (method+path+duration+actor על כל בקשה מוצלחת) + לוג מפורש ל-login מוצלח/כושל ב-`AuthService` (WARN לכושל, LOG למוצלח — כנדרש בסעיף 96 "Failed authentication attempts"). שגיאות 500+ ממשיכות להירשם ע"י `AllExceptionsFilter` הקיים. **אומת בפועל דרך Docker** — נראה בלוגים: `[HTTP] POST /auth/login...`, `[AuthService] Failed login attempt...`/`Successful login...` |
 | Docker (backend + mongo) | 101 | ✅ הושלם | `Dockerfile` (multi-stage build), `docker-compose.yml` (backend+mongo+healthcheck+volume), `.dockerignore`. **אומת בפועל** — `docker compose up` הורץ עד הסוף מול MongoDB אמיתי (ראו סעיף הבאג הקריטי למטה) |
-| טסטים (unit/integration/security) | 102 | ✅ הושלם | `npm run test:integration` — 28 טסטים אוטומטיים מול MongoDB אמיתי (in-memory, לא mock) דרך `mongodb-memory-server`, ב-5 קבצים: functional (5) + security (9, סעיף 102.3) + dynamic sort/filter Participants (6, סעיף 38-40) + dynamic sort/filter Staff/Groups (8, נוסף 2026-08-13). **תפס באג אמיתי נוסף** (ראו למטה) בכתיבה הראשונה שלו, לא רק ב"בדיקת בדיקה" — ההוכחה הטובה ביותר שהתשתית הזו עובדת |
+| טסטים (unit/integration/security) | 102 | ✅ הושלם | `npm run test:integration` — 33 טסטים אוטומטיים מול MongoDB אמיתי (in-memory, לא mock) דרך `mongodb-memory-server`, ב-6 קבצים: functional (5) + security (9, סעיף 102.3) + dynamic sort/filter Participants (6, סעיף 38-40) + dynamic sort/filter Staff/Groups (8) + RegistrationRequest field validation (5, סעיפים 13/21/36-37). **תפס 2 באגים אמיתיים נוספים** (#2 ו-#3, ראו למטה) בכתיבה הראשונה שלהם, לא רק ב"בדיקת בדיקה" — ההוכחה הטובה ביותר שהתשתית הזו עובדת |
 
 ---
 
@@ -141,6 +141,58 @@ cast אוטומטי לפי סוג השדה בסכימה (string↔ObjectId). **`
 כל ObjectId שנכנס ל-`$match` (או כל שלב אחר) בתוך pipeline חייב להיות
 מומר ידנית מראש. חשוב לזכור אם יתווספו עוד aggregation pipelines בעתיד.
 
+## 🚨 באג שלישי שנמצא ותוקן — nested schema classes נופלים בשקט ל-Mixed (2026-08-13)
+
+**נמצא תוך כדי כתיבת טסט integration ל-field-level permissions על RegistrationRequest**
+(`registration-request-field-validation.integration-spec.ts`) — שוב לא בבדיקה
+ידנית: ה-happy-path הכי בסיסי (הרשמה עצמית עם שדה רגיל, בלי permissions מפורש)
+נכשל עם `403 FIELD_EDIT_FORBIDDEN`, על אף שברירת המחדל התיעודית (סעיף 21)
+היא ש-Participant **כן** יכול לערוך שדות משלו כברירת מחדל.
+
+**מה היה שבור:** ב-`field-definition.schema.ts`, המחלקות המקוננות
+`RolePermission`/`FieldPermissions`/`DisplaySettings`/`SearchSettings` היו
+מחלקות TS רגילות עם `@Prop()` על השדות שלהן, **אבל בלי `@Schema()` ובלי
+`SchemaFactory.createForClass()`** — כלומר מעולם לא הפכו ל-Schema אמיתי.
+`@Prop({ type: FieldPermissions })` (מעביר את ה-**מחלקה** עצמה, לא Schema)
+גרם ל-Mongoose ליפול בשקט ל-`Mixed` (אומת ישירות:
+`schema.path('permissions').instance === 'Mixed'`).
+
+**איך זה התבטא בפועל:** תחת `Mixed`, אף אחת מברירות המחדל המקוננות
+(`participant.edit: true`, `staff.edit: false`, וכו') **מעולם לא הוחלה**.
+`FieldDefinitionsService.create()` תמיד שולח `permissions: dto.permissions ?? {}`
+(אובייקט ריק מפורש, לא `undefined`) — וכש-`{}` מגיע ל-path מסוג `Mixed`
+בלי schema אמיתי, **כל השדה `permissions` נעדר לגמרי מהמסמך שנשמר במסד**
+(לא even `{}` — נבדק ישירות מול ה-collection). כל FieldDefinition שנוצר בלי
+לספק `permissions` מפורש קיבל בפועל "אין הרשאת edit לאף אחד חוץ מ-ADMIN" —
+ההפך הגמור מברירת המחדל התיעודית. זה לא נתפס קודם כי כל טסט/שימוש קודם
+שנגע בזה או כתב כ-ADMIN (שעוקף את הבדיקה לגמרי, סעיף 21) או סיפק
+`searchSettings`/`permissions` מלא במפורש (עובד תחת Mixed כי אתה פשוט
+שומר מה שנתת — הבעיה היא רק בברירת המחדל).
+
+**התיקון:** כל אחת מ-4 המחלקות המקוננות קיבלה `@Schema({ _id: false })` +
+`SchemaFactory.createForClass()` משלה, וה-`@Prop({ type: ... })` בהורה
+מפנה עכשיו ל-**Schema** האמיתי (`FieldPermissionsSchema` וכו'), לא למחלקה.
+
+**כלל עומד חדש (נוסף גם ל-CLAUDE.md):** מחלקת TypeScript מקוננת שמשמשת
+כ-`@Prop({ type: SomeClass })` **חייבת** להיות מעוטרת ב-`@Schema()` ועוברת
+דרך `SchemaFactory.createForClass()`, וה-`type:` בהורה חייב להפנות ל-**Schema
+שנוצר**, לא למחלקה עצמה — אחרת Mongoose נופל בשקט ל-`Mixed` בלי שגיאה,
+בלי warning, ומאבד לגמרי את ברירות המחדל/ה-cast/ה-validation של אותו path.
+
+**סריקה נוספת:** `grep` ממוקד על כל `src/**/*.schema.ts` אחרי התיקון מצא **מופע
+נוסף** מאותו דפוס בדיוק — `RequestedData` ב-`registration-request.schema.ts`
+(`@Prop({ type: RequestedData, required: true })`, שוב בלי `@Schema()`).
+תוקן באותו אופן (`@Schema({ _id: false })` + `SchemaFactory.createForClass()`
++ הפניה ל-`RequestedDataSchema`). לא נמצאו מופעים נוספים (נבדק עם
+`grep -rn "type:\s*[A-Z]\w+,?\s*$"` על כל קבצי ה-schema — כל שאר ההתאמות
+הן `type: String`/`type: Date`/`type: SchemaTypes...` תקינים).
+
+**אומת:** נבדק ישירות (`schema.path('permissions').instance`) לפני התיקון
+(`'Mixed'`) ואחרי (`'Embedded'`/סכימה אמיתית); טסט regression חדש קורא
+ישירות מה-DB ומוודא ש-`permissions.participant`/`permissions.staff` מכילים
+את ערכי ברירת המחדל המלאים גם כש-Admin לא ציין permissions בכלל. כל 33
+טסטי האינטגרציה (כולל כל הקיימים) עברו אחרי התיקון — ללא רגרסיה.
+
 ---
 
 ## החלטות פתוחות / שאלות לבעל המוצר
@@ -156,11 +208,12 @@ cast אוטומטי לפי סוג השדה בסכימה (string↔ObjectId). **`
 - **שינוי fieldType (סעיף 32):** נבדק בפועל מול **כל** הערכים הקיימים תחת אותו `internalKey` בכל הרשומות של המוסד/סוג הישות (Participant/Staff/Group). אם ולו רשומה אחת לא תואמת — כל הבקשה נדחית (`INCOMPATIBLE_FIELD_TYPE_CHANGE`), אין המרה חלקית. לביצועים בקנה מידה גדול ייתכן שיהיה צריך אופטימיזציה (אגרגציה עם projection) — כרגע טוען את כל המסמכים התואמים לזיכרון.
 - **מחיקת FieldDefinition (סעיף 82.1):** מחיקת ה-FieldDefinition עצמה סינכרונית; ניקוי ה-`customFields` מהרשומות הקיימות (`$pull`) הוא "fire-and-forget" — לא ממתינים לו בתגובת ה-API, רק נרשם ללוג בסיום. אין עדיין תשתית job queue אמיתית (Bull/Redis) — זה ריצה ברקע של אותו תהליך Node, לא job עצמאי.
 - **DynamicValidationPipe — reject ולא strip (סעיף 36):** האפיון מציע "Automatically strip or reject". בחרתי **reject** (שגיאה חוזרת ללקוח) על ניסיון לכתוב שדה שאין הרשאת edit אליו, במקום לזרוק את הערך בשקט — כדי שכשלים בהרשאות יהיו גלויים ולא יבלעו בלי הודעה. ממומש ב-`DynamicFieldsValidatorService`.
-- **Field-level READ permissions (סעיף 21) — הושלם:** `DynamicFieldsValidatorService.getViewableKeys`/`filterByViewableKeys`. שדה עם `view:false` לתפקיד המבקש מוסתר לגמרי מ-GET (list/single/אחרי update) של Participant/Staff/Group. ADMIN רואה תמיד הכל (מחזיר `null` = "אין סינון"). entry עם מפתח (`k`) שאין לו FieldDefinition תואם מוסתר גם הוא מ-STAFF/PARTICIPANT כברירת מחדל בטוחה (לדוגמה שארית אחרי מחיקת שדה שהניקוי ברקע עוד לא הגיע אליה).
+- **Field-level READ permissions (סעיף 21) — הושלם:** `DynamicFieldsValidatorService.getViewableKeys`/`filterByViewableKeys`. שדה עם `view:false` לתפקיד המבקש מוסתר לגמרי מ-GET (list/single/אחרי update) של Participant/Staff/Group. ADMIN רואה תמיד הכל (מחזיר `null` = "אין סינון"). entry עם מפתח (`k`) שאין לו FieldDefinition תואם מוסתר גם הוא מ-STAFF/PARTICIPANT כברירת מחדל בטוחה (לדוגמה שארית אחרי מחיקת שדה שהניקוי ברקע עוד לא הגיע אליה). **עדכון 2026-08-13:** עד לתיקון הבאג הקריטי השלישי (Mixed fallback, ראו למעלה), ברירות המחדל של `permissions` בפועל מעולם לא הוחלו על שדות שנוצרו בלי permissions מפורש — נבדק/תוקן/מכוסה עכשיו ב-regression test.
+- **Field-level permissions על RegistrationRequest (סעיפים 13, 21, 36-37) — הושלם 2026-08-13:** `RegistrationRequestsService.submit()` (בקשה ציבורית, ללא JWT) עכשיו מריץ `DynamicFieldsValidatorService.validate()` עם `role: Role.Participant` — כי הנתונים הופכים ל-Participant באישור, אז ההרשאה ההגיונית היא `permissions.participant.edit`. קודם לכן שום אימות דינמי (unknown-key/type/required/write-permission) לא רץ בכלל ב-submit(); כשל היחיד היה מאוחר ומבלבל, ב-approve() (עם role=Admin, שכמעט תמיד עובר). **Edge case מתועד (לא נפתר, ידוע):** אם Admin מגדיר שדה כ-`required:true` וגם `permissions.participant.edit:false` (למשל שדה פנימי חובה שרק Admin ממלא), הרשמה עצמית תיכשל תמיד עם "missing required field" — אין דרך למשתמש הציבורי למלא אותו. לא טופל — נדרשת החלטת מוצר אם/איך לאפשר קומבינציה כזו.
 - **תיקון אגבי: `_id:false` על איברי customFields:** גילינו שהמערכים `customFields:[{k,v}]` ב-Participant/Staff/Group/RegistrationRequest קיבלו `_id` אוטומטי מ-Mongoose לכל איבר (לא חלק מהמבנה הקנוני בסעיף 35). תוקן בכל הסכימות.
 - **ביצועי סינון READ:** `getViewableKeys` נקרא **פעם אחת** לכל בקשת GET (גם ברשימה שלמה, לא לכל רשומה) כדי למנוע N+1 שאילתות.
 - **ADMIN עוקף את כל בדיקות ה-DynamicValidationPipe פרט למבנה/טיפוס:** ADMIN עדיין עובר בדיקת "unknown key"/"invalid type"/"missing required" (בדיקות שלמות דאטה), אבל לא בדיקת הרשאת edit (יש לו תמיד edit מלא, per סעיף 21 editorial note). קריאות פנימיות (כמו `RegistrationRequestsService.approve`) עוברות עם role=ADMIN כברירת מחדל.
-- **Dynamic filter/sort מומש רק ב-Participants (סעיפים 38-40):** `filters` הוא JSON string `{internalKey:value}` שהופך ל-`$all`/`$elemMatch` (AND בין כמה שדות), נאכף רק אם `searchSettings.filterable=true`. `sortBy`/`sortDir` — אם `sortBy` הוא שדה מערכת (firstName/lastName/createdAt) ממוינים רגיל; אם זה internalKey עם `searchSettings.sortable=true` — עובר ל-aggregation pipeline (`$addFields`+`$let`+`$filter` לחלץ את הערך מתוך מערך ה-customFields, `$sort` לפיו). **חשוב:** אין עדיין סביבת אינטגרציה עם MongoDB אמיתי בפרויקט (סעיף 102 עדיין לא בנוי) — נתיב ה-aggregation נבדק רק ב-build/lint/e2e-boot (שלא נוגע ב-DB), לא הורץ בפועל מול דאטה אמיתי. מומלץ לבדוק ידנית לפני production. Staff ו-Groups לא קיבלו את אותה הרחבה — יש להם רק pagination בסיסי.
+- **Dynamic filter/sort — כעת ב-Participants+Staff+Groups (סעיפים 38-40, עודכן 2026-08-13):** `filters` הוא JSON string `{internalKey:value}` שהופך ל-`$all`/`$elemMatch` (AND בין כמה שדות), נאכף רק אם `searchSettings.filterable=true`. `sortBy`/`sortDir` — אם `sortBy` הוא שדה מערכת ממוינים רגיל; אם זה internalKey עם `searchSettings.sortable=true` — עובר ל-aggregation pipeline (`$addFields`+`$let`+`$filter` לחלץ את הערך מתוך מערך ה-customFields, `$sort` לפיו). הלוגיקה עברה ל-`DynamicQueryService` משותף (ראו למעלה) ומכוסה ב-integration tests אמיתיים מול MongoDB לכל שלוש הישויות.
 - **npm audit fix (2026-07-27):** תוקנה חולשת אבטחה "high severity" בחבילה עקיפה (`brace-expansion`, תלות של jest/typescript-eslint) שהתגלתה בבדיקת clone נקי. תלות פיתוח בלבד, לא בקוד הייצור. `npm audit fix` פתר בלי לשבור כלום (build/lint/test אומתו אחרי).
 - **mustChangePassword — עלות ביצועים מקובלת (סעיף 70.1):** `MustChangePasswordGuard` קורא ל-DB בכל בקשה מוגנת (לא נשען על השדה ב-JWT, כי סעיף 67 אוסר "frequently changing settings" בטוקן — וזה בדיוק שדה כזה: משתמש שממש שינה סיסמה חייב "להשתחרר" מיידית, לא אחרי שה-cache יפוג). Trade-off מתועד: תקינות מיידית > ביצועים.
 - **נעילת חשבון per-username (סעיף 90.1):** נוספו שדות `failedLoginAttempts`/`lockedUntil` ל-`User`. לאחר 5 ניסיונות כושלים על אותו חשבון — ננעל ל-15 דקות, ללא קשר לכתובת ה-IP. המספרים (5 ניסיונות, 15 דקות) הם ערכים שנבחרו — האפיון לא מציין מספרים מדויקים. חשבון נעול מדולג ישירות (לא מנסים bcrypt.compare בכלל) — לא מגדילים את מונה הכשלונות בזמן שהחשבון כבר נעול.
@@ -171,9 +224,9 @@ cast אוטומטי לפי סוג השדה בסכימה (string↔ObjectId). **`
 
 ## מה הבא בתור (Next up)
 
-1. Field-level permissions על RegistrationRequest (אם רלוונטי) ו-Audit Log (סעיף 97, מוגדר עתידי ולא v1 — לוודא שזה אכן לא נדרש עדיין).
-2. לוודא שאין עוד מופעים של הבאג הקריטי הראשון (type:Types.ObjectId) במקומות שלא נבדקו — סקירה נוספת/lint rule מותאם שמונע רגרסיה.
-3. שקול להוסיף `search` (חיפוש טקסט חופשי בשדות מערכת) גם ל-Staff/Groups, בדומה ל-Participants — לא התבקש עדיין באפיון באופן מפורש עבורם, לא נוסף כברירת מחדל.
+1. לוודא שאין עוד מופעים של באג #1 (`type:Types.ObjectId`) או באג #3 (מחלקה מקוננת בלי `@Schema()`+`SchemaFactory.createForClass()`) במקומות שלא נבדקו — לסרוק את כל ה-schemas עם grep ממוקד (`@Prop({ type: [A-Z]` בלי `Schema`/`SchemaTypes` בשם) ולשקול ESLint rule מותאם שמונע רגרסיה משתי הצורות.
+2. שקול להוסיף `search` (חיפוש טקסט חופשי בשדות מערכת) גם ל-Staff/Groups, בדומה ל-Participants — לא התבקש עדיין באפיון באופן מפורש עבורם, לא נוסף כברירת מחדל.
+3. שקול לטפל ב-edge case המתועד: `required:true` + `permissions.participant.edit:false` על אותו שדה חוסם הרשמה עצמית לצמיתות (ראו החלטה פתוחה למעלה) — צריך החלטת מוצר.
 
 ## יומן דחיפות (Session Log)
 
@@ -197,3 +250,4 @@ cast אוטומטי לפי סוג השדה בסכימה (string↔ObjectId). **`
 | 2026-08-13 | Claude (Miryam) | Integration tests למיון/סינון דינמי (`dynamic-field-sort-filter.integration-spec.ts`, סעיפים 38-40) — **תפס באג אמיתי שני** בכתיבתו הראשונה: `.aggregate()` לא עובר cast אוטומטי כמו `.find()`, `institutionId` string לא תאם ObjectId מאוחסן → 0 תוצאות. תוקן ב-`findSortedByDynamicField` | ✅ נדחף |
 | 2026-08-13 | Claude (Miryam) | Logging מובנה (סעיף 96) — `LoggingInterceptor` גלובלי + לוג מפורש login מוצלח/כושל ב-`AuthService`. אומת בפועל מול Docker אמיתי (`docker compose logs`) | ✅ נדחף |
 | 2026-08-13 | Claude (Miryam) | Dynamic search/filter/sort הורחב ל-Staff+Groups (סעיפים 38-40) — לוגיקה חולצה ל-`DynamicQueryService` משותף (`dynamic-fields/dynamic-query.service.ts`); ParticipantsService רופקטר לשימוש בו (ללא שינוי התנהגות); 8 טסטי אינטגרציה חדשים מול MongoDB אמיתי | ✅ נדחף |
+| 2026-08-13 | Claude (Miryam) | Field-level permissions על RegistrationRequest (סעיפים 13, 21, 36-37) — `submit()` מריץ עכשיו `DynamicFieldsValidatorService.validate()` עם role=Participant. **תפס באג קריטי שלישי** (Mixed fallback על מחלקות מקוננות בלי `@Schema()`/`SchemaFactory.createForClass()` ב-`field-definition.schema.ts` — permissions/displaySettings/searchSettings מעולם לא קיבלו ברירות מחדל אמיתיות). Audit Log (97) אושר סופית כ-out-of-scope לפי האפיון עצמו. תוקן + 5 טסטי אינטגרציה חדשים; כל 33 טסטי האינטגרציה עברו | ✅ נדחף |

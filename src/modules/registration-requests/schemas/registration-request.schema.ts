@@ -18,7 +18,16 @@ export class CustomFieldEntry {
   v: unknown;
 }
 
-/** The data a would-be participant submitted, copied onto Participant on approval (spec 15). */
+/**
+ * The data a would-be participant submitted, copied onto Participant on
+ * approval (spec 15). Must be `@Schema()` + `SchemaFactory.createForClass()`
+ * and referenced by its Schema (not the bare class) from the parent's
+ * `@Prop({ type: ... })` — a bare class silently falls back to `Mixed` in
+ * Mongoose, losing `trim: true`/defaults/validation (critical bug #3,
+ * 2026-08-13, see PROGRESS.md and field-definition.schema.ts for the same
+ * pattern found and fixed there first).
+ */
+@Schema({ _id: false })
 export class RequestedData {
   @Prop({ required: true, trim: true })
   firstName: string;
@@ -30,6 +39,7 @@ export class RequestedData {
   @Prop({ type: [{ k: String, v: Object, _id: false }], default: [] })
   customFields: CustomFieldEntry[];
 }
+export const RequestedDataSchema = SchemaFactory.createForClass(RequestedData);
 
 /**
  * Temporary storage for self-registration requests before Administrator
@@ -46,7 +56,7 @@ export class RegistrationRequest {
   })
   institutionId: Types.ObjectId;
 
-  @Prop({ type: RequestedData, required: true })
+  @Prop({ type: RequestedDataSchema, required: true })
   requestedData: RequestedData;
 
   @Prop({

@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { InstitutionStatus, Role } from '../../common/enums';
+import { FieldEntityType, InstitutionStatus, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { PaginatedResult } from '../../common/interfaces';
 import {
   generateTempPassword,
   hashPassword,
 } from '../../common/utils/password.util';
+import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { InstitutionsService } from '../institutions/institutions.service';
 import { ParticipantUserMode } from '../institutions/schemas/institution-settings.schema';
 import { ParticipantsService } from '../participants/participants.service';
@@ -29,6 +30,7 @@ export class RegistrationRequestsService {
     private readonly institutionsService: InstitutionsService,
     private readonly participantsService: ParticipantsService,
     private readonly usersService: UsersService,
+    private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
   ) {}
 
   /**
@@ -57,6 +59,22 @@ export class RegistrationRequestsService {
         'SELF_REGISTRATION_DISABLED',
       );
     }
+
+    // Dynamic-field validation (spec 36-37: unknown-key rejection, type/
+    // required checks, field-level write permission) was previously never
+    // run on self-registration submissions — bad data only surfaced later,
+    // confusingly, when an Admin tried to approve() it. The submitter isn't
+    // authenticated and has no Role of their own, but the data becomes a
+    // Participant record on approval, so we validate against
+    // FieldDefinition.permissions.participant.edit — the same permission
+    // that governs a Participant editing their own record post-registration
+    // (spec 21). See PROGRESS.md open decisions.
+    await this.dynamicFieldsValidator.validate({
+      institutionId: dto.institutionId,
+      entityType: FieldEntityType.Participant,
+      role: Role.Participant,
+      customFields: dto.customFields ?? [],
+    });
 
     // v1 performs no automatic duplicate detection (spec 13.1) — duplicates
     // are allowed and left to manual admin review.
