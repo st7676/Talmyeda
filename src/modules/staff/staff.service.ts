@@ -4,17 +4,22 @@ import { Model } from 'mongoose';
 import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { PaginatedResult } from '../../common/interfaces';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
+import { DynamicQueryService } from '../dynamic-fields/dynamic-query.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { QueryStaffDto } from './dto/query-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { Staff, StaffDocument } from './schemas/staff.schema';
+
+/** System (non-dynamic) fields sortable via a plain index-backed sort. Spec 60. */
+const SYSTEM_SORT_FIELDS = new Set(['firstName', 'lastName', 'createdAt']);
 
 @Injectable()
 export class StaffService {
   constructor(
     @InjectModel(Staff.name) private readonly staffModel: Model<StaffDocument>,
     private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
+    private readonly dynamicQueryService: DynamicQueryService,
   ) {}
 
   async create(
@@ -36,28 +41,41 @@ export class StaffService {
     });
   }
 
+  /** GET /staff — pagination plus dynamic-field filter/sort (spec 38-40, 76). */
   async findAll(
     institutionId: string,
-    pagination: PaginationQueryDto,
+    query: QueryStaffDto,
     actingRole: Role = Role.Admin,
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    const { page, limit } = pagination;
+    const { page, limit, filters, sortBy, sortDir } = query;
     const filter = { institutionId, isDeleted: false };
-    const [rawItems, total, viewableKeys] = await Promise.all([
-      this.staffModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .exec(),
-      this.staffModel.countDocuments(filter).exec(),
+    const [{ items: rawItems, total }, viewableKeys] = await Promise.all([
+      this.dynamicQueryService.findAll(
+        this.staffModel,
+        institutionId,
+        FieldEntityType.Staff,
+        filter,
+        {
+          page,
+          limit,
+          filters,
+          sortBy,
+          sortDir,
+          systemSortFields: SYSTEM_SORT_FIELDS,
+        },
+      ),
       this.dynamicFieldsValidator.getViewableKeys(
         institutionId,
         FieldEntityType.Staff,
         actingRole,
       ),
     ]);
-    const items = rawItems.map((doc) => this.toReadable(doc, viewableKeys));
+    const items = rawItems.map((doc) =>
+      this.toReadable(
+        doc as StaffDocument | Record<string, unknown>,
+        viewableKeys,
+      ),
+    );
     return { items, page, limit, total };
   }
 
@@ -106,12 +124,19 @@ export class StaffService {
     return this.toReadable(staff, viewableKeys);
   }
 
-  /** Applies field-level READ filtering (spec 21) to a document destined for an API response. */
+  /**
+   * Applies field-level READ filtering (spec 21) to a document destined for
+   * an API response. Accepts either a Mongoose document (from .find()) or a
+   * plain object (from .aggregate(), used by dynamic-field sorting) since
+   * aggregate results never have Mongoose document methods.
+   */
   private toReadable(
-    doc: StaffDocument,
+    doc: StaffDocument | Record<string, unknown>,
     viewableKeys: Set<string> | null,
   ): Record<string, unknown> {
-    const obj = doc.toObject() as unknown as Record<string, unknown> & {
+    const obj = (typeof (doc as StaffDocument).toObject === 'function'
+      ? (doc as StaffDocument).toObject()
+      : doc) as unknown as Record<string, unknown> & {
       customFields: { k: string; v: unknown }[];
     };
     obj.customFields = this.dynamicFieldsValidator.filterByViewableKeys(

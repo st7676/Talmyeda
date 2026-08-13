@@ -11,11 +11,11 @@ import {
   Query,
 } from '@nestjs/common';
 import { CurrentUser, Roles } from '../../common/decorators';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import type { AuthenticatedUser } from '../../common/interfaces';
 import { CreateGroupDto } from './dto/create-group.dto';
+import { QueryGroupsDto } from './dto/query-groups.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { GroupsService } from './groups.service';
 
@@ -37,11 +37,11 @@ export class GroupsController {
   @Get()
   findAll(
     @CurrentUser() user: AuthenticatedUser,
-    @Query() pagination: PaginationQueryDto,
+    @Query() query: QueryGroupsDto,
   ) {
     return this.groupsService.findAll(
       this.requireInstitution(user),
-      pagination,
+      query,
       user.role,
     );
   }

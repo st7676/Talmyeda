@@ -11,11 +11,11 @@ import {
   Query,
 } from '@nestjs/common';
 import { CurrentUser, Roles } from '../../common/decorators';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import type { AuthenticatedUser } from '../../common/interfaces';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { QueryStaffDto } from './dto/query-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
 
@@ -37,11 +37,11 @@ export class StaffController {
   @Get()
   findAll(
     @CurrentUser() user: AuthenticatedUser,
-    @Query() pagination: PaginationQueryDto,
+    @Query() query: QueryStaffDto,
   ) {
     return this.staffService.findAll(
       this.requireInstitution(user),
-      pagination,
+      query,
       user.role,
     );
   }

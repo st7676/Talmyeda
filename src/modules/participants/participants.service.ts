@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { AuthenticatedUser, PaginatedResult } from '../../common/interfaces';
 import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
-import { FieldDefinitionsService } from '../field-definitions/field-definitions.service';
+import { DynamicQueryService } from '../dynamic-fields/dynamic-query.service';
 import { InstitutionsService } from '../institutions/institutions.service';
 import {
   ParticipantGroup,
@@ -36,7 +36,7 @@ export class ParticipantsService {
     private readonly institutionsService: InstitutionsService,
     private readonly usersService: UsersService,
     private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
-    private readonly fieldDefinitionsService: FieldDefinitionsService,
+    private readonly dynamicQueryService: DynamicQueryService,
   ) {}
 
   /** POST /participants. Spec section 71 (Administrator, or Staff per settings). */
@@ -86,61 +86,24 @@ export class ParticipantsService {
 
     await this.applyContextScope(user, filter);
 
-    // Field metadata is needed for both dynamic filtering and dynamic
-    // sorting, and for the field-level READ filter below — one query.
-    const definitions = await this.fieldDefinitionsService.findActiveForEntity(
-      institutionId,
-      FieldEntityType.Participant,
-    );
-    const definitionsByKey = new Map(
-      definitions.map((d) => [d.internalKey, d]),
-    );
-
-    if (filters) {
-      this.applyDynamicFilters(filter, filters, definitionsByKey);
-    }
-
-    const direction = sortDir === 'desc' ? -1 : 1;
-    let dynamicSortKey: string | null = null;
-    let sortStage: Record<string, 1 | -1> = { createdAt: -1 };
-    if (sortBy) {
-      if (SYSTEM_SORT_FIELDS.has(sortBy)) {
-        sortStage = { [sortBy]: direction };
-      } else {
-        const definition = definitionsByKey.get(sortBy);
-        if (!definition) {
-          throw AppError.validation(
-            `Unknown sort field: ${sortBy}`,
-            'UNKNOWN_SORT_FIELD',
-          );
-        }
-        if (!definition.searchSettings.sortable) {
-          throw AppError.validation(
-            `Field "${definition.displayName}" is not sortable`,
-            'FIELD_NOT_SORTABLE',
-          );
-        }
-        dynamicSortKey = sortBy;
-      }
-    }
-
-    const [rawItems, total, viewableKeys] = await Promise.all([
-      dynamicSortKey
-        ? this.findSortedByDynamicField(
-            filter,
-            dynamicSortKey,
-            direction,
-            page,
-            limit,
-          )
-        : this.participantModel
-            .find(filter)
-            .sort(sortStage)
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .exec(),
-      this.participantModel.countDocuments(filter).exec(),
-      // One query for the whole page, not one per record (spec 21 field-level READ).
+    // Dynamic filter/sort + field metadata lookup shared with Staff/Groups
+    // (spec 38-40) — see DynamicQueryService. viewableKeys (spec 21
+    // field-level READ) is fetched in parallel since it's independent.
+    const [{ items: rawItems, total }, viewableKeys] = await Promise.all([
+      this.dynamicQueryService.findAll(
+        this.participantModel,
+        institutionId,
+        FieldEntityType.Participant,
+        filter,
+        {
+          page,
+          limit,
+          filters,
+          sortBy,
+          sortDir,
+          systemSortFields: SYSTEM_SORT_FIELDS,
+        },
+      ),
       this.dynamicFieldsValidator.getViewableKeys(
         institutionId,
         FieldEntityType.Participant,
@@ -148,122 +111,13 @@ export class ParticipantsService {
       ),
     ]);
 
-    const items = rawItems.map((doc) => this.toReadable(doc, viewableKeys));
+    const items = rawItems.map((doc) =>
+      this.toReadable(
+        doc as ParticipantDocument | Record<string, unknown>,
+        viewableKeys,
+      ),
+    );
     return { items, page, limit, total };
-  }
-
-  /**
-   * Dynamic filtering (spec 39): only fields marked filterable may be used.
-   * Each {key: value} pair becomes an $elemMatch clause; AND-ed together via
-   * $all so a matching Participant must contain every requested pair.
-   */
-  private applyDynamicFilters(
-    filter: Record<string, unknown>,
-    rawFilters: string,
-    definitionsByKey: Map<
-      string,
-      { displayName: string; searchSettings: { filterable: boolean } }
-    >,
-  ): void {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(rawFilters);
-    } catch {
-      throw AppError.validation(
-        'filters must be a JSON object, e.g. {"field_x":"value"}',
-        'INVALID_FILTERS',
-      );
-    }
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
-      throw AppError.validation(
-        'filters must be a JSON object',
-        'INVALID_FILTERS',
-      );
-    }
-
-    const clauses: Record<string, unknown>[] = [];
-    for (const [key, value] of Object.entries(
-      parsed as Record<string, unknown>,
-    )) {
-      const definition = definitionsByKey.get(key);
-      if (!definition) {
-        throw AppError.validation(
-          `Unknown filter field: ${key}`,
-          'UNKNOWN_FILTER_FIELD',
-        );
-      }
-      if (!definition.searchSettings.filterable) {
-        throw AppError.validation(
-          `Field "${definition.displayName}" is not filterable`,
-          'FIELD_NOT_FILTERABLE',
-        );
-      }
-      clauses.push({ $elemMatch: { k: key, v: value } });
-    }
-    if (clauses.length > 0) {
-      filter.customFields = { $all: clauses };
-    }
-  }
-
-  /**
-   * Dynamic sorting (spec 40): sorting by a customFields value requires an
-   * aggregation pipeline (match, extract the matching entry's v, sort by
-   * it) rather than a simple index-backed sort, since the value lives
-   * inside an array element rather than a top-level field.
-   *
-   * Unlike .find()/.findOne(), .aggregate() is passed straight to the
-   * MongoDB driver and never goes through Mongoose's automatic query
-   * casting — a string institutionId in `filter` would silently never
-   * match the real ObjectId stored on each document, returning zero
-   * results. Cast it explicitly before it reaches $match. Caught by
-   * test/integration/dynamic-field-sort-filter.integration-spec.ts.
-   */
-  private async findSortedByDynamicField(
-    filter: Record<string, unknown>,
-    sortKey: string,
-    direction: 1 | -1,
-    page: number,
-    limit: number,
-  ): Promise<Record<string, unknown>[]> {
-    const matchFilter = { ...filter };
-    if (typeof matchFilter.institutionId === 'string') {
-      matchFilter.institutionId = new Types.ObjectId(matchFilter.institutionId);
-    }
-
-    const pipeline = [
-      { $match: matchFilter },
-      {
-        $addFields: {
-          __sortValue: {
-            $let: {
-              vars: {
-                match: {
-                  $first: {
-                    $filter: {
-                      input: '$customFields',
-                      as: 'cf',
-                      cond: { $eq: ['$$cf.k', sortKey] },
-                    },
-                  },
-                },
-              },
-              in: '$$match.v',
-            },
-          },
-        },
-      },
-      { $sort: { __sortValue: direction } },
-      { $skip: (page - 1) * limit },
-      { $limit: limit },
-      { $unset: '__sortValue' },
-    ];
-    return this.participantModel
-      .aggregate<Record<string, unknown>>(pipeline)
-      .exec();
   }
 
   /** GET /participants/:id. Spec section 73. */

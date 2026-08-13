@@ -4,17 +4,22 @@ import { Model } from 'mongoose';
 import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { PaginatedResult } from '../../common/interfaces';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
+import { DynamicQueryService } from '../dynamic-fields/dynamic-query.service';
 import { CreateGroupDto } from './dto/create-group.dto';
+import { QueryGroupsDto } from './dto/query-groups.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { Group, GroupDocument } from './schemas/group.schema';
+
+/** System (non-dynamic) fields sortable via a plain index-backed sort. Spec 60. */
+const SYSTEM_SORT_FIELDS = new Set(['name', 'createdAt']);
 
 @Injectable()
 export class GroupsService {
   constructor(
     @InjectModel(Group.name) private readonly groupModel: Model<GroupDocument>,
     private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
+    private readonly dynamicQueryService: DynamicQueryService,
   ) {}
 
   async create(
@@ -35,28 +40,41 @@ export class GroupsService {
     });
   }
 
+  /** GET /groups — pagination plus dynamic-field filter/sort (spec 38-40, 77). */
   async findAll(
     institutionId: string,
-    pagination: PaginationQueryDto,
+    query: QueryGroupsDto,
     actingRole: Role = Role.Admin,
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    const { page, limit } = pagination;
+    const { page, limit, filters, sortBy, sortDir } = query;
     const filter = { institutionId, isDeleted: false };
-    const [rawItems, total, viewableKeys] = await Promise.all([
-      this.groupModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .exec(),
-      this.groupModel.countDocuments(filter).exec(),
+    const [{ items: rawItems, total }, viewableKeys] = await Promise.all([
+      this.dynamicQueryService.findAll(
+        this.groupModel,
+        institutionId,
+        FieldEntityType.Group,
+        filter,
+        {
+          page,
+          limit,
+          filters,
+          sortBy,
+          sortDir,
+          systemSortFields: SYSTEM_SORT_FIELDS,
+        },
+      ),
       this.dynamicFieldsValidator.getViewableKeys(
         institutionId,
         FieldEntityType.Group,
         actingRole,
       ),
     ]);
-    const items = rawItems.map((doc) => this.toReadable(doc, viewableKeys));
+    const items = rawItems.map((doc) =>
+      this.toReadable(
+        doc as GroupDocument | Record<string, unknown>,
+        viewableKeys,
+      ),
+    );
     return { items, page, limit, total };
   }
 
@@ -105,12 +123,19 @@ export class GroupsService {
     return this.toReadable(group, viewableKeys);
   }
 
-  /** Applies field-level READ filtering (spec 21) to a document destined for an API response. */
+  /**
+   * Applies field-level READ filtering (spec 21) to a document destined for
+   * an API response. Accepts either a Mongoose document (from .find()) or a
+   * plain object (from .aggregate(), used by dynamic-field sorting) since
+   * aggregate results never have Mongoose document methods.
+   */
   private toReadable(
-    doc: GroupDocument,
+    doc: GroupDocument | Record<string, unknown>,
     viewableKeys: Set<string> | null,
   ): Record<string, unknown> {
-    const obj = doc.toObject() as unknown as Record<string, unknown> & {
+    const obj = (typeof (doc as GroupDocument).toObject === 'function'
+      ? (doc as GroupDocument).toObject()
+      : doc) as unknown as Record<string, unknown> & {
       customFields: { k: string; v: unknown }[];
     };
     obj.customFields = this.dynamicFieldsValidator.filterByViewableKeys(
