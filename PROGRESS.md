@@ -62,7 +62,7 @@
 | Pagination אחיד | 86, 98.1 | ✅ הושלם | `PaginationQueryDto` + `PaginatedResult<T>` בכל ה-list endpoints |
 | Logging | 96 | ⬜ טרם התחיל | |
 | Docker (backend + mongo) | 101 | ✅ הושלם | `Dockerfile` (multi-stage build), `docker-compose.yml` (backend+mongo+healthcheck+volume), `.dockerignore`. **אומת בפועל** — `docker compose up` הורץ עד הסוף מול MongoDB אמיתי (ראו סעיף הבאג הקריטי למטה) |
-| טסטים (unit/integration/security) | 102 | ✅ הושלם | `npm run test:integration` — 14 טסטים אוטומטיים מול MongoDB אמיתי (in-memory, לא mock) דרך `mongodb-memory-server`, ב-3 קבצים: functional (5) + security (9, סעיף 102.3 — tenant isolation, unauthenticated access, RBAC, mustChangePassword enforcement). **אומת פעמיים שהם באמת תופסים רגרסיות:** גם הבאג הקריטי וגם שבירת tenant isolation שוחזרו זמנית ונצפה כישלון מדויק, לפני שחזור התיקון |
+| טסטים (unit/integration/security) | 102 | ✅ הושלם | `npm run test:integration` — 20 טסטים אוטומטיים מול MongoDB אמיתי (in-memory, לא mock) דרך `mongodb-memory-server`, ב-4 קבצים: functional (5) + security (9, סעיף 102.3) + dynamic sort/filter (6, סעיף 38-40, aggregation pipeline). **תפס באג אמיתי נוסף** (ראו למטה) בכתיבה הראשונה שלו, לא רק ב"בדיקת בדיקה" — ההוכחה הטובה ביותר שהתשתית הזו עובדת |
 
 ---
 
@@ -117,6 +117,30 @@ Institution↔InstitutionSettings.
 (`settings: null`, `PUT` מחזיר 404). זה מוכיח שהטסטים באמת תופסים את
 הבאג הזה ולא רק "עוברים במקרה". אחרי זה שוחזר התיקון וכל הטסטים חזרו לירוק.
 
+## 🚨 באג שני שנמצא ותוקן — aggregate() לא עובר cast אוטומטי (2026-08-13)
+
+**נמצא בכתיבה הראשונה של טסט integration למיון דינמי** (`dynamic-field-sort-filter.integration-spec.ts`)
+— לא בבדיקה ידנית הפעם, אלא ישירות מכתיבת הטסט האוטומטי. זו ההוכחה הכי
+טובה לכך שהתשתית עובדת: תפסה באג לפני שהמשתמשים בכלל נתקלים בו.
+
+**מה היה שבור:** `ParticipantsService.findSortedByDynamicField` (המיון
+הדינמי לפי שדה מותאם אישית, סעיף 40) בונה `filter.institutionId` כ-**string**
+(מגיע מ-JWT) ומעביר אותו ל-`.aggregate([{ $match: filter }, ...])`.
+בניגוד ל-`.find()`/`.findOne()`, **`.aggregate()` לא עובר דרך שכבת ה-cast
+האוטומטי של Mongoose** — הוא מועבר ישירות ל-MongoDB driver. string
+לא תואם ObjectId מאוחסן → `$match` לא מוצא אף מסמך → **תוצאה ריקה
+לגמרי** (לא רק סדר שגוי — 0 תוצאות).
+
+**התיקון:** לפני בניית ה-pipeline, `filter.institutionId` מומר במפורש
+ל-`new Types.ObjectId(...)` אם הוא string. תוקן ב-`findSortedByDynamicField`
+בלבד (הפונקציה היחידה בכל הפרויקט שמשתמשת ב-`.aggregate()` — נבדק עם
+grep גורף על `src/`).
+
+**לקח כללי:** `.find()`/`.findOne()`/`.findOneAndUpdate()` וכו' עוברים
+cast אוטומטי לפי סוג השדה בסכימה (string↔ObjectId). **`.aggregate()` לא** —
+כל ObjectId שנכנס ל-`$match` (או כל שלב אחר) בתוך pipeline חייב להיות
+מומר ידנית מראש. חשוב לזכור אם יתווספו עוד aggregation pipelines בעתיד.
+
 ---
 
 ## החלטות פתוחות / שאלות לבעל המוצר
@@ -145,11 +169,10 @@ Institution↔InstitutionSettings.
 
 ## מה הבא בתור (Next up)
 
-1. הרחבת integration tests לכסות את ה-aggregation pipeline של מיון דינמי (FieldDefinition sortable) — עדיין לא נבדק אוטומטית.
-2. לוודא שאין עוד מופעים של הבאג הקריטי (type:Types.ObjectId) במקומות שלא נבדקו — סקירה נוספת/lint rule מותאם שמונע רגרסיה.
-3. Logging מובנה (סעיף 96).
-4. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה).
-5. Field-level permissions על RegistrationRequest (אם רלוונטי) ו-Audit Log (סעיף 97, מוגדר עתידי ולא v1 — לוודא שזה אכן לא נדרש עדיין).
+1. Logging מובנה (סעיף 96).
+2. Dynamic search/filter/sort — להרחיב מ-Participants גם ל-Staff ו-Groups (כרגע רק Participants קיבל את זה — ואם ייבנה עתידית `.aggregate()` נוסף שם, לזכור את כלל ה-cast הידני).
+3. Field-level permissions על RegistrationRequest (אם רלוונטי) ו-Audit Log (סעיף 97, מוגדר עתידי ולא v1 — לוודא שזה אכן לא נדרש עדיין).
+4. לוודא שאין עוד מופעים של הבאג הקריטי הראשון (type:Types.ObjectId) במקומות שלא נבדקו — סקירה נוספת/lint rule מותאם שמונע רגרסיה.
 
 ## יומן דחיפות (Session Log)
 
@@ -170,3 +193,4 @@ Institution↔InstitutionSettings.
 | 2026-08-10 | Claude (Miryam) | Docker (Dockerfile+docker-compose+dockerignore), הורץ בפועל עם `docker compose up` מול MongoDB אמיתי. **תפס באג קריטי** ב-10 קבצי schema (`type:Types.ObjectId` → `Mixed` type, לא `ObjectId`) — תוקן ל-`SchemaTypes.ObjectId`, אומת מחדש מקצה-לקצה (register/login/CRUD/cross-collection filter) | ✅ נדחף |
 | 2026-08-10 | Claude (Miryam) | Integration tests אוטומטיים (`test/integration/`, `mongodb-memory-server`) — 5 טסטים מול Mongo אמיתי; אומת שהם תופסים רגרסיות ע"י החזרת הבאג הקריטי זמנית ובדיקה שהטסטים נכשלים כצפוי | ✅ נדחף |
 | 2026-08-10 | Claude (Miryam) | Security integration tests (סעיף 102.3) — `security.integration-spec.ts`: tenant isolation (2 מוסדות), unauthenticated access, RBAC (STAFF vs Admin), mustChangePassword enforcement. 9 טסטים; אומת ששבירת tenant isolation גורמת לכישלון מדויק לפני שחזור | ✅ נדחף |
+| 2026-08-13 | Claude (Miryam) | Integration tests למיון/סינון דינמי (`dynamic-field-sort-filter.integration-spec.ts`, סעיפים 38-40) — **תפס באג אמיתי שני** בכתיבתו הראשונה: `.aggregate()` לא עובר cast אוטומטי כמו `.find()`, `institutionId` string לא תאם ObjectId מאוחסן → 0 תוצאות. תוקן ב-`findSortedByDynamicField` | ✅ נדחף |

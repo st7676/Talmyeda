@@ -28,6 +28,10 @@ Talmyeda — פלטפורמת SaaS גנרית, רב-דיירותית (multi-tena
   — זו מחלקת ה-BSON עצמה, לא ה-SchemaType, וגורמת ל-Mongoose להגדיר את השדה
   כ-`Mixed` ולאבד cast אוטומטי string↔ObjectId (באג קריטי שנתפס ותוקן ב-2026-08-10,
   ראו PROGRESS.md). `Types.ObjectId` עדיין תקין כטיפוס TypeScript (`institutionId: Types.ObjectId | null`).
+- **`.aggregate()` לא עובר cast אוטומטי כמו `.find()`:** כל ObjectId (כולל `institutionId`)
+  שנכנס ל-`$match`/שלב אחר בתוך pipeline חייב המרה ידנית ל-`new Types.ObjectId(...)` מראש —
+  אחרת string לא יתאים ל-ObjectId מאוחסן ותקבלו 0 תוצאות בשקט (באג נתפס ותוקן ב-2026-08-13,
+  ראו PROGRESS.md, `ParticipantsService.findSortedByDynamicField`).
 
 ## מבנה ופקודות
 

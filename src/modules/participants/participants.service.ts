@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { AuthenticatedUser, PaginatedResult } from '../../common/interfaces';
@@ -214,6 +214,13 @@ export class ParticipantsService {
    * aggregation pipeline (match, extract the matching entry's v, sort by
    * it) rather than a simple index-backed sort, since the value lives
    * inside an array element rather than a top-level field.
+   *
+   * Unlike .find()/.findOne(), .aggregate() is passed straight to the
+   * MongoDB driver and never goes through Mongoose's automatic query
+   * casting — a string institutionId in `filter` would silently never
+   * match the real ObjectId stored on each document, returning zero
+   * results. Cast it explicitly before it reaches $match. Caught by
+   * test/integration/dynamic-field-sort-filter.integration-spec.ts.
    */
   private async findSortedByDynamicField(
     filter: Record<string, unknown>,
@@ -222,8 +229,13 @@ export class ParticipantsService {
     page: number,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
+    const matchFilter = { ...filter };
+    if (typeof matchFilter.institutionId === 'string') {
+      matchFilter.institutionId = new Types.ObjectId(matchFilter.institutionId);
+    }
+
     const pipeline = [
-      { $match: filter },
+      { $match: matchFilter },
       {
         $addFields: {
           __sortValue: {
