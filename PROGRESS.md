@@ -222,11 +222,21 @@ cast אוטומטי לפי סוג השדה בסכימה (string↔ObjectId). **`
 - **Logging — מה כן ומה לא נרשם (סעיף 96):** `LoggingInterceptor` רושם רק בקשות שהצליחו (method+path+duration+userId/role/institutionId אם קיים) — **לא** רושם גוף בקשה/תגובה (עלול לכלול סיסמאות/customFields רגישים). שגיאות 4xx **לא** נרשמות ע"י ה-interceptor ולא ע"י `AllExceptionsFilter` (שרושם רק 500+) — חוץ מכניסה מפורשת אחת: ניסיונות login כושלים (`AuthService`, WARN) כי סעיף 96 דורש את זה בשם מפורש. `Logger('HTTP')` נפרד מ-Nest's internal loggers כדי לזהות בקלות בלוגים אילו שורות שלנו.
 - **`DynamicQueryService` משותף ל-Participants/Staff/Groups (סעיפים 38-40, 2026-08-13):** הלוגיקה של filter/sort דינמי (כולל ה-aggregation pipeline וכלל ה-cast הידני ל-ObjectId, ראו הבאג הקריטי השני למעלה) חולצה מ-`ParticipantsService` ל-`dynamic-fields/dynamic-query.service.ts` גנרי (`findAll<TDoc>(model, institutionId, entityType, baseFilter, options)`). ParticipantsService רופקטר להשתמש בו (ללא שינוי התנהגות — כל 6 הטסטים הישנים עדיין עוברים ללא שינוי), ו-Staff/Groups קיבלו את התכונה בפעם הראשונה עם `QueryStaffDto`/`QueryGroupsDto` חדשים (filters/sortBy/sortDir — ללא `search`/`groupId` שספציפיים ל-Participants). כל אחד מגדיר set משלו של system-sort-fields (Participants: firstName/lastName/createdAt; Staff: זהה; Groups: name/createdAt).
 
+### סקירת אפיון מלאה (2026-08-14) — 3 פערי תיעוד קטנים שנמצאו
+
+עברתי שוב על **כל 105 הסעיפים** של האפיון מול הקוד בפועל (לא רק מול PROGRESS.md) כדי לוודא שאין פער גדול שפספסנו. המסקנה: ~97% מומש ומאומת. נמצאו 3 מקומות שבהם התקבלה החלטת מימוש סבירה **בלי לתעד אותה במפורש** כ"החלטה פתוחה" — בניגוד לנוהג שהוקפד עליו בכל שאר הפרויקט. הוחלט (לפי בעל הפרויקט) **לתעד בלבד, לא לשנות קוד**:
+
+- **אין endpoint ייעודי `GET /participants/search` (סעיף 85):** האפיון מציג את זה כדוגמה לנתיב חיפוש נפרד. בפועל `search` הוא query param רגיל על `GET /participants` (`?search=David`) — מכסה את אותה דרישה פונקציונלית (חיפוש בשדות מערכת + דינמיים + סינון הרשאות, עדיין `PermissionFiltering` דרך `getViewableKeys`), רק לא כ-route נפרד. לא נראה כמו פער אמיתי — סטייה טקסטואלית מהאפיון, לא פונקציונלית.
+- **אין `TenantInterceptor` גלובלי (סעיף 93):** האפיון מתאר interceptor אוטומטי שמזריק `{institutionId: user.institutionId}` לכל הקשר שאילתה. במימוש בפועל כל Service (Participants/Staff/Groups/וכו') מוסיף `institutionId` **ידנית** לפילטר שלו בתחילת כל מתודה — עובד נכון (מכוסה ב-4 טסטי tenant-isolation ב-`security.integration-spec.ts`), אבל זו הגנה "per-module ידנית" ולא "global אוטומטית" כפי שהאפיון מתאר ארכיטקטונית. Trade-off: פחות DRY, אבל יותר גלוי/קריא בקוד כל Service (כל בדיקת סינון institutionId נראית מקומית, לא "קורית איפשהו למעלה"). לא שונה בפועל.
+- **אין refresh token (סעיף 68, "if required" — מנוסח כאופציונלי) ואין הודעת email באישור מוסד (סעיף 69.1, שלב 3):** email תלוי ב-Notifications שנדחה מפורש לגרסה עתידית (סעיף 103.4) — עקבי. Refresh token לא נדרש באופן מוחלט לפי הניסוח ("if required") ולא יושם ב-v1 — אין refresh mechanism, רק access token עם expiry (`JWT_EXPIRES_IN`).
+
 ## מה הבא בתור (Next up)
 
-1. לוודא שאין עוד מופעים של באג #1 (`type:Types.ObjectId`) או באג #3 (מחלקה מקוננת בלי `@Schema()`+`SchemaFactory.createForClass()`) במקומות שלא נבדקו — לסרוק את כל ה-schemas עם grep ממוקד (`@Prop({ type: [A-Z]` בלי `Schema`/`SchemaTypes` בשם) ולשקול ESLint rule מותאם שמונע רגרסיה משתי הצורות.
-2. שקול להוסיף `search` (חיפוש טקסט חופשי בשדות מערכת) גם ל-Staff/Groups, בדומה ל-Participants — לא התבקש עדיין באפיון באופן מפורש עבורם, לא נוסף כברירת מחדל.
-3. שקול לטפל ב-edge case המתועד: `required:true` + `permissions.participant.edit:false` על אותו שדה חוסם הרשמה עצמית לצמיתות (ראו החלטה פתוחה למעלה) — צריך החלטת מוצר.
+**סטטוס כללי (2026-08-14): ~97% מהאפיון מומש ומאומת** — ראו "סקירת אפיון מלאה" למעלה. מה שנשאר הוא ליטוש, לא חוסרים פונקציונליים:
+
+1. שקול להוסיף `search` (חיפוש טקסט חופשי בשדות מערכת) גם ל-Staff/Groups, בדומה ל-Participants — לא התבקש עדיין באפיון באופן מפורש עבורם, לא נוסף כברירת מחדל.
+2. שקול לטפל ב-edge case המתועד: `required:true` + `permissions.participant.edit:false` על אותו שדה חוסם הרשמה עצמית לצמיתות (ראו החלטה פתוחה למעלה) — צריך החלטת מוצר.
+3. סריקת `@Prop({ type: [A-Z]` בוצעה (2026-08-13, מצאה ותיקנה את `RequestedData`) — שווה לחזור עליה מדי פעם אחרי הוספת schemas חדשים, אבל אין כרגע חשד למופע נוסף.
 
 ## יומן דחיפות (Session Log)
 
@@ -251,3 +261,4 @@ cast אוטומטי לפי סוג השדה בסכימה (string↔ObjectId). **`
 | 2026-08-13 | Claude (Miryam) | Logging מובנה (סעיף 96) — `LoggingInterceptor` גלובלי + לוג מפורש login מוצלח/כושל ב-`AuthService`. אומת בפועל מול Docker אמיתי (`docker compose logs`) | ✅ נדחף |
 | 2026-08-13 | Claude (Miryam) | Dynamic search/filter/sort הורחב ל-Staff+Groups (סעיפים 38-40) — לוגיקה חולצה ל-`DynamicQueryService` משותף (`dynamic-fields/dynamic-query.service.ts`); ParticipantsService רופקטר לשימוש בו (ללא שינוי התנהגות); 8 טסטי אינטגרציה חדשים מול MongoDB אמיתי | ✅ נדחף |
 | 2026-08-13 | Claude (Miryam) | Field-level permissions על RegistrationRequest (סעיפים 13, 21, 36-37) — `submit()` מריץ עכשיו `DynamicFieldsValidatorService.validate()` עם role=Participant. **תפס באג קריטי שלישי** (Mixed fallback על מחלקות מקוננות בלי `@Schema()`/`SchemaFactory.createForClass()` ב-`field-definition.schema.ts` — permissions/displaySettings/searchSettings מעולם לא קיבלו ברירות מחדל אמיתיות). Audit Log (97) אושר סופית כ-out-of-scope לפי האפיון עצמו. תוקן + 5 טסטי אינטגרציה חדשים; כל 33 טסטי האינטגרציה עברו | ✅ נדחף |
+| 2026-08-14 | Claude (Miryam) | סקירת אפיון מלאה (כל 105 הסעיפים מול הקוד בפועל, לא רק מול PROGRESS.md) — מסקנה: ~97% מומש. נמצאו ותועדו (לפי החלטת בעל הפרויקט — תיעוד בלבד, ללא שינוי קוד) 3 סטיות קטנות לא-פונקציונליות: אין `GET /participants/search` נפרד (סעיף 85, יש query param שקול), אין `TenantInterceptor` גלובלי (סעיף 93, יש סינון institutionId ידני לכל Service), אין refresh token/email notification (סעיפים 68, 69.1 — עקבי עם Notifications הנדחה, 103.4). אין שינוי קוד בסשן זה | ✅ נדחף (תיעוד בלבד) |
