@@ -10,6 +10,11 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
  * institution-scoped FieldDefinition lookup.
  */
 export class QueryGroupsDto extends PaginationQueryDto {
+  /** Free-text search on name (spec 72, 85), case-insensitive substring match. */
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @IsOptional()
   @IsString()
   filters?: string;

@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { AuthenticatedUser, PaginatedResult } from '../../common/interfaces';
+import { escapeRegex } from '../../common/utils/regex.util';
 import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { DynamicQueryService } from '../dynamic-fields/dynamic-query.service';
 import { InstitutionsService } from '../institutions/institutions.service';
@@ -72,7 +73,7 @@ export class ParticipantsService {
     const filter: Record<string, unknown> = { institutionId, isDeleted: false };
 
     if (search) {
-      const regex = new RegExp(this.escapeRegex(search), 'i');
+      const regex = new RegExp(escapeRegex(search), 'i');
       filter.$or = [{ firstName: regex }, { lastName: regex }];
     }
 
@@ -346,9 +347,5 @@ export class ParticipantsService {
       );
     }
     return user.institutionId;
-  }
-
-  private escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }

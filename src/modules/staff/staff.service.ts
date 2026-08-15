@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { PaginatedResult } from '../../common/interfaces';
+import { escapeRegex } from '../../common/utils/regex.util';
 import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { DynamicQueryService } from '../dynamic-fields/dynamic-query.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
@@ -47,8 +48,12 @@ export class StaffService {
     query: QueryStaffDto,
     actingRole: Role = Role.Admin,
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    const { page, limit, filters, sortBy, sortDir } = query;
-    const filter = { institutionId, isDeleted: false };
+    const { page, limit, search, filters, sortBy, sortDir } = query;
+    const filter: Record<string, unknown> = { institutionId, isDeleted: false };
+    if (search) {
+      const regex = new RegExp(escapeRegex(search), 'i');
+      filter.$or = [{ firstName: regex }, { lastName: regex }];
+    }
     const [{ items: rawItems, total }, viewableKeys] = await Promise.all([
       this.dynamicQueryService.findAll(
         this.staffModel,
