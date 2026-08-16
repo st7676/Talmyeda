@@ -37,6 +37,12 @@
 | 14 | [`14-docker-explained.md`](14-docker-explained.md) | Docker מהיסוד: container מול VM, image מול container, Dockerfile, docker-compose, volumes |
 | 15 | [`15-enum-vs-union-types.md`](15-enum-vs-union-types.md) | TypeScript: מתי `enum` ומתי union type, ולמה זה משנה ב-runtime |
 
+## דוח מסכם — למי שרוצה תמונה מלאה במסמך אחד
+
+| # | קובץ | על מה זה |
+|---|------|----------|
+| 16 | [`16-full-project-report.md`](16-full-project-report.md) | **דוח מסכם מפורט** — כל תהליך הבנייה מההתחלה עד היום במסמך אחד: ארכיטקטורה, תהליך העבודה, מנוע השדות הדינמי, שלושת הבאגים הקריטיים בפירוט, אסטרטגיית בדיקות, ציר זמן מלא. מתאים למי שלא הייתה מעורבת ורוצה תמונה שלמה בלי לקפוץ בין קבצים. זמין גם כ-Word (`16-full-project-report.docx`). |
+
 ## עקרון-על שכדאי לזכור תוך כדי קריאה
 
 כל מודול בפרויקט בנוי **באותה תבנית קבועה**:
