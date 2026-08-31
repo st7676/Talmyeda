@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
@@ -7,6 +7,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
+import Link from '@mui/material/Link';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../api/client';
 
@@ -65,6 +66,12 @@ export function LoginPage() {
           <Button type="submit" variant="contained" size="large" disabled={loading}>
             {loading ? <CircularProgress size={24} /> : 'התחברות'}
           </Button>
+          <Typography variant="body2" sx={{ textAlign: 'center' }}>
+            עדיין אין לכם מוסד רשום?{' '}
+            <Link component={RouterLink} to="/register">
+              רישום מוסד חדש
+            </Link>
+          </Typography>
         </Box>
       </Paper>
     </Box>
