@@ -12,9 +12,11 @@ import IconButton from '@mui/material/IconButton';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import GroupsIcon from '@mui/icons-material/Groups';
 import { DataTable, type Column } from '../components/DataTable';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CustomFieldsEditor } from '../components/CustomFieldsEditor';
+import { GroupMembersDialog } from '../components/GroupMembersDialog';
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { groupsApi } from '../api/endpoints';
@@ -45,6 +47,7 @@ export function GroupsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
+  const [membersTarget, setMembersTarget] = useState<Group | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -145,6 +148,9 @@ export function GroupsPage() {
           isAdmin
             ? (row) => (
                 <Stack direction="row">
+                  <IconButton size="small" onClick={() => setMembersTarget(row)} title="ניהול חברי קבוצה">
+                    <GroupsIcon fontSize="small" />
+                  </IconButton>
                   <IconButton size="small" onClick={() => openEdit(row)}>
                     <EditIcon fontSize="small" />
                   </IconButton>
@@ -156,6 +162,10 @@ export function GroupsPage() {
             : undefined
         }
       />
+
+      {membersTarget && (
+        <GroupMembersDialog group={membersTarget} onClose={() => setMembersTarget(null)} />
+      )}
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? 'עריכת קבוצה' : 'קבוצה חדשה'}</DialogTitle>

@@ -225,3 +225,25 @@ export interface Message {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ParticipantGroupMembership {
+  _id: string;
+  institutionId: string;
+  participantId: string;
+  groupId: string;
+  startDate: string;
+  endDate: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StaffGroupMembership {
+  _id: string;
+  institutionId: string;
+  staffId: string;
+  groupId: string;
+  roleDescription: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

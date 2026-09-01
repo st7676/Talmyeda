@@ -19,6 +19,8 @@ import type {
   InstitutionStatus,
   PublicFieldMeta,
   Message,
+  ParticipantGroupMembership,
+  StaffGroupMembership,
 } from '../types';
 
 // ---------- Auth ----------
@@ -154,6 +156,11 @@ export const participantGroupsApi = {
   assign: (participantId: string, groupId: string, startDate?: string) =>
     api.post('/participant-groups', { participantId, groupId, startDate }).then((r) => r.data.data),
   remove: (id: string) => api.delete(`/participant-groups/${id}`).then((r) => r.data.data),
+  /** Active memberships for a group — was written on the backend but never routed until now. */
+  listForGroup: (groupId: string) =>
+    api
+      .get<{ data: ParticipantGroupMembership[] }>('/participant-groups', { params: { groupId } })
+      .then((r) => r.data.data),
 };
 
 // ---------- Staff-Groups ----------
@@ -161,6 +168,10 @@ export const staffGroupsApi = {
   assign: (staffId: string, groupId: string, roleDescription?: string) =>
     api.post('/staff-groups', { staffId, groupId, roleDescription }).then((r) => r.data.data),
   remove: (id: string) => api.delete(`/staff-groups/${id}`).then((r) => r.data.data),
+  listForGroup: (groupId: string) =>
+    api
+      .get<{ data: StaffGroupMembership[] }>('/staff-groups', { params: { groupId } })
+      .then((r) => r.data.data),
 };
 
 // ---------- Registration Requests ----------
