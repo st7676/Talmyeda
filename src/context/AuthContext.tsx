@@ -17,7 +17,7 @@ interface AuthContextValue {
   token: string | null;
   claims: JwtPayload | null;
   mustChangePassword: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<{ mustChangePassword: boolean }>;
   logout: () => void;
   setMustChangePassword: (v: boolean) => void;
 }
@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('accessToken', accessToken);
     setToken(accessToken);
     setMustChangePassword(mustChangePassword);
+    return { mustChangePassword };
   };
 
   const logout = () => {

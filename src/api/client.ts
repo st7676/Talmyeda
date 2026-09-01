@@ -22,6 +22,14 @@ api.interceptors.response.use(
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
+    } else if (error.response?.data?.error?.code === 'MUST_CHANGE_PASSWORD') {
+      // Backend blocks every endpoint except /users/change-password until the
+      // password is changed (mustChangePassword isn't in the JWT, so a stale
+      // page reload after a temp-password login would otherwise show
+      // confusing 403s everywhere instead of the change-password screen).
+      if (window.location.pathname !== '/change-password') {
+        window.location.href = '/change-password';
+      }
     }
     return Promise.reject(error);
   },

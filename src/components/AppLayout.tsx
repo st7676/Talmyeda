@@ -17,6 +17,7 @@ import Avatar from '@mui/material/Avatar';
 import Tooltip from '@mui/material/Tooltip';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import PersonIcon from '@mui/icons-material/Person';
 import GroupIcon from '@mui/icons-material/Group';
 import BadgeIcon from '@mui/icons-material/Badge';
 import Diversity3Icon from '@mui/icons-material/Diversity3';
@@ -48,6 +49,7 @@ const navSections: NavSection[] = [
     title: 'ראשי',
     items: [
       { label: 'לוח בקרה', path: '/', icon: <DashboardIcon />, roles: [Role.Admin, Role.Staff, Role.Participant] },
+      { label: 'הפרופיל שלי', path: '/my-profile', icon: <PersonIcon />, roles: [Role.Participant] },
     ],
   },
   {

@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterInstitutionPage } from './pages/RegisterInstitutionPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { MyProfilePage } from './pages/MyProfilePage';
 import { ParticipantsPage } from './pages/ParticipantsPage';
 import { StaffPage } from './pages/StaffPage';
 import { GroupsPage } from './pages/GroupsPage';
@@ -34,6 +35,14 @@ function App() {
               }
             >
               <Route path="/" element={<DashboardPage />} />
+              <Route
+                path="/my-profile"
+                element={
+                  <ProtectedRoute roles={[Role.Participant]}>
+                    <MyProfilePage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/participants"
                 element={

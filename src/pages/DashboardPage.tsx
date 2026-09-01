@@ -6,6 +6,7 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import GroupIcon from '@mui/icons-material/Group';
+import PersonIcon from '@mui/icons-material/Person';
 import BadgeIcon from '@mui/icons-material/Badge';
 import Diversity3Icon from '@mui/icons-material/Diversity3';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
@@ -17,6 +18,7 @@ import { Role } from '../types';
 import type { ReactNode } from 'react';
 
 const cards: { label: string; desc: string; path: string; icon: ReactNode; roles: Role[] }[] = [
+  { label: 'הפרופיל שלי', desc: 'צפייה ועדכון הפרטים שלך', path: '/my-profile', icon: <PersonIcon fontSize="large" />, roles: [Role.Participant] },
   { label: 'משתתפים', desc: 'ניהול משתתפי המוסד', path: '/participants', icon: <GroupIcon fontSize="large" />, roles: [Role.Admin, Role.Staff] },
   { label: 'צוות', desc: 'ניהול אנשי הצוות', path: '/staff', icon: <BadgeIcon fontSize="large" />, roles: [Role.Admin] },
   { label: 'קבוצות', desc: 'ניהול קבוצות ושיוכים', path: '/groups', icon: <Diversity3Icon fontSize="large" />, roles: [Role.Admin, Role.Staff, Role.Participant] },

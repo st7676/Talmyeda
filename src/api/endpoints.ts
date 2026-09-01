@@ -50,6 +50,7 @@ export interface ListParams {
 }
 
 export const usersApi = {
+  me: () => api.get<{ data: User }>('/users/me').then((r) => r.data.data),
   list: (params: ListParams) =>
     api.get<{ data: Paginated<User> }>('/users', { params }).then((r) => r.data.data),
   get: (id: string) => api.get<{ data: User }>(`/users/${id}`).then((r) => r.data.data),

@@ -24,8 +24,8 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(username, password);
-      navigate('/', { replace: true });
+      const { mustChangePassword } = await login(username, password);
+      navigate(mustChangePassword ? '/change-password' : '/', { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
