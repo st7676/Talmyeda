@@ -36,6 +36,16 @@ export class StaffGroupsService {
     return this.staffGroupModel.find({ institutionId, staffId }).exec();
   }
 
+  /**
+   * GET /staff-groups?groupId=X. Was previously written (mirroring
+   * findForStaff) but never exposed via any controller route — there was no
+   * way at all to list "who's in this group" for staff. See findForStaff
+   * above and ParticipantGroupsService.findForGroup for the equivalent.
+   */
+  findForGroup(institutionId: string, groupId: string) {
+    return this.staffGroupModel.find({ institutionId, groupId }).exec();
+  }
+
   /** DELETE /staff-groups/:id. Spec section 79. Physical removal (no membership history requirement here). */
   async remove(id: string, institutionId: string): Promise<void> {
     const res = await this.staffGroupModel

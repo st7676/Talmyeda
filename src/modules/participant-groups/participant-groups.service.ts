@@ -47,8 +47,15 @@ export class ParticipantGroupsService {
       .exec();
   }
 
+  /**
+   * Active memberships only — this is "who's currently in the group", not
+   * full history. Now exposed via GET /participant-groups?groupId=X (was
+   * written but never routed to anything before).
+   */
   findForGroup(institutionId: string, groupId: string) {
-    return this.participantGroupModel.find({ institutionId, groupId }).exec();
+    return this.participantGroupModel
+      .find({ institutionId, groupId, active: true })
+      .exec();
   }
 
   /**

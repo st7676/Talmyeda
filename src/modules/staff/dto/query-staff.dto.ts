@@ -27,4 +27,14 @@ export class QueryStaffDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortDir?: 'asc' | 'desc';
+
+  /**
+   * Filter to active members of one group (mirrors QueryParticipantsDto's
+   * groupId, added at the same time for the same reason — there was
+   * previously no way to list "who's in this group" for Staff at all, only
+   * Participants).
+   */
+  @IsOptional()
+  @IsString()
+  groupId?: string;
 }

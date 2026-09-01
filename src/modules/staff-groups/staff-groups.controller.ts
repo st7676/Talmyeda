@@ -2,16 +2,19 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CurrentUser, Roles } from '../../common/decorators';
 import { Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import type { AuthenticatedUser } from '../../common/interfaces';
 import { AssignStaffGroupDto } from './dto/assign-staff-group.dto';
+import { ListByGroupQueryDto } from './dto/list-by-group-query.dto';
 import { StaffGroupsService } from './staff-groups.service';
 
 /** Spec section 79 — Administrator only. */
@@ -26,6 +29,18 @@ export class StaffGroupsController {
     @Body() dto: AssignStaffGroupDto,
   ) {
     return this.staffGroupsService.assign(this.requireInstitution(user), dto);
+  }
+
+  /** GET /staff-groups?groupId=X — see ParticipantGroupsController.findForGroup for the same rationale. */
+  @Get()
+  findForGroup(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListByGroupQueryDto,
+  ) {
+    return this.staffGroupsService.findForGroup(
+      this.requireInstitution(user),
+      query.groupId,
+    );
   }
 
   @Delete(':id')

@@ -7,6 +7,10 @@ import { AuthenticatedUser, PaginatedResult } from '../../common/interfaces';
 import { escapeRegex } from '../../common/utils/regex.util';
 import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { DynamicQueryService } from '../dynamic-fields/dynamic-query.service';
+import {
+  StaffGroup,
+  StaffGroupDocument,
+} from '../staff-groups/schemas/staff-group.schema';
 import { UsersService } from '../users/users.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
@@ -20,6 +24,8 @@ const SYSTEM_SORT_FIELDS = new Set(['firstName', 'lastName', 'createdAt']);
 export class StaffService {
   constructor(
     @InjectModel(Staff.name) private readonly staffModel: Model<StaffDocument>,
+    @InjectModel(StaffGroup.name)
+    private readonly staffGroupModel: Model<StaffGroupDocument>,
     private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
     private readonly dynamicQueryService: DynamicQueryService,
     private readonly usersService: UsersService,
@@ -50,11 +56,18 @@ export class StaffService {
     query: QueryStaffDto,
     actingRole: Role = Role.Admin,
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    const { page, limit, search, filters, sortBy, sortDir } = query;
+    const { page, limit, search, filters, sortBy, sortDir, groupId } = query;
     const filter: Record<string, unknown> = { institutionId, isDeleted: false };
     if (search) {
       const regex = new RegExp(escapeRegex(search), 'i');
       filter.$or = [{ firstName: regex }, { lastName: regex }];
+    }
+    if (groupId) {
+      const memberships = await this.staffGroupModel
+        .find({ institutionId, groupId })
+        .select('staffId')
+        .exec();
+      filter._id = { $in: memberships.map((m) => m.staffId) };
     }
     const [{ items: rawItems, total }, viewableKeys] = await Promise.all([
       this.dynamicQueryService.findAll(
