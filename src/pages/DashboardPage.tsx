@@ -20,7 +20,7 @@ import type { ReactNode } from 'react';
 
 const cards: { label: string; desc: string; path: string; icon: ReactNode; roles: Role[] }[] = [
   { label: 'מוסדות', desc: 'אישור/השעיה של מוסדות בפלטפורמה', path: '/platform/institutions', icon: <DomainIcon fontSize="large" />, roles: [Role.SuperAdmin] },
-  { label: 'הפרופיל שלי', desc: 'צפייה ועדכון הפרטים שלך', path: '/my-profile', icon: <PersonIcon fontSize="large" />, roles: [Role.Participant] },
+  { label: 'הפרופיל שלי', desc: 'צפייה ועדכון הפרטים שלך', path: '/my-profile', icon: <PersonIcon fontSize="large" />, roles: [Role.Participant, Role.Staff] },
   { label: 'משתתפים', desc: 'ניהול משתתפי המוסד', path: '/participants', icon: <GroupIcon fontSize="large" />, roles: [Role.Admin, Role.Staff] },
   { label: 'צוות', desc: 'ניהול אנשי הצוות', path: '/staff', icon: <BadgeIcon fontSize="large" />, roles: [Role.Admin] },
   { label: 'קבוצות', desc: 'ניהול קבוצות ושיוכים', path: '/groups', icon: <Diversity3Icon fontSize="large" />, roles: [Role.Admin, Role.Staff, Role.Participant] },

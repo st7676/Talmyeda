@@ -14,14 +14,20 @@ import DialogActions from '@mui/material/DialogActions';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import Alert from '@mui/material/Alert';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import IconButton from '@mui/material/IconButton';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { DataTable, type Column } from '../components/DataTable';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { registrationRequestsApi } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 import { useNotify } from '../context/NotificationContext';
-import type { RegistrationRequest } from '../types';
+import { useFieldDefinitions } from '../hooks/useFieldDefinitions';
+import type { CustomFieldValue, RegistrationRequest } from '../types';
 import { RegistrationRequestStatus, FieldEntityType } from '../types';
 
 const statusColor: Record<RegistrationRequestStatus, 'warning' | 'success' | 'error'> = {
@@ -58,6 +64,40 @@ export function RegistrationRequestsPage() {
   const [createdCreds, setCreatedCreds] = useState<{ username: string; tempPassword: string } | null>(
     null,
   );
+  const [viewTarget, setViewTarget] = useState<RegistrationRequest | null>(null);
+
+  // Real gap this closes: the admin could approve/reject a self-registration
+  // without ever seeing what the person actually filled in for custom
+  // fields — the table only showed name/type/status/date. Loaded once for
+  // both entity types so internalKey -> displayName is available instantly
+  // wherever a request's customFields need labeling (view dialog + approve
+  // dialog), instead of raw keys like "field_3a56c543cd3a".
+  const { fields: participantFields } = useFieldDefinitions(FieldEntityType.Participant);
+  const { fields: staffFields } = useFieldDefinitions(FieldEntityType.Staff);
+
+  const fieldLabel = (entityType: FieldEntityType, key: string): string => {
+    const defs = entityType === FieldEntityType.Staff ? staffFields : participantFields;
+    return defs.find((d) => d.internalKey === key)?.displayName ?? key;
+  };
+
+  const renderCustomFields = (entityType: FieldEntityType, customFields: CustomFieldValue[]) => {
+    if (customFields.length === 0) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          לא הוגשו שדות נוספים.
+        </Typography>
+      );
+    }
+    return (
+      <List dense disablePadding>
+        {customFields.map((f) => (
+          <ListItem key={f.k} disableGutters>
+            <ListItemText primary={fieldLabel(entityType, f.k)} secondary={String(f.v)} />
+          </ListItem>
+        ))}
+      </List>
+    );
+  };
 
   const load = () => {
     setLoading(true);
@@ -175,32 +215,54 @@ export function RegistrationRequestsPage() {
             <MenuItem value={RegistrationRequestStatus.Rejected}>נדחה</MenuItem>
           </TextField>
         }
-        actions={(row) =>
-          row.status === RegistrationRequestStatus.Pending ? (
-            <Stack direction="row" spacing={1}>
-              <Button
-                size="small"
-                startIcon={<CheckIcon />}
-                color="success"
-                onClick={() => {
-                  setCreateUserChecked(true);
-                  setApproveTarget(row);
-                }}
-              >
-                אישור
-              </Button>
-              <Button
-                size="small"
-                startIcon={<CloseIcon />}
-                color="error"
-                onClick={() => setRejectTarget(row)}
-              >
-                דחייה
-              </Button>
-            </Stack>
-          ) : null
-        }
+        actions={(row) => (
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <IconButton size="small" onClick={() => setViewTarget(row)} title="צפייה בפרטים">
+              <VisibilityIcon fontSize="small" />
+            </IconButton>
+            {row.status === RegistrationRequestStatus.Pending && (
+              <>
+                <Button
+                  size="small"
+                  startIcon={<CheckIcon />}
+                  color="success"
+                  onClick={() => {
+                    setCreateUserChecked(true);
+                    setApproveTarget(row);
+                  }}
+                >
+                  אישור
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={<CloseIcon />}
+                  color="error"
+                  onClick={() => setRejectTarget(row)}
+                >
+                  דחייה
+                </Button>
+              </>
+            )}
+          </Stack>
+        )}
       />
+
+      <Dialog open={!!viewTarget} onClose={() => setViewTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          פרטי בקשה — {viewTarget?.requestedData.firstName} {viewTarget?.requestedData.lastName}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            סוג: {viewTarget && (entityTypeLabel[viewTarget.entityType] ?? viewTarget.entityType)} ·
+            סטטוס: {viewTarget && statusLabel[viewTarget.status]}
+          </Typography>
+          {viewTarget &&
+            renderCustomFields(viewTarget.entityType, viewTarget.requestedData.customFields)}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewTarget(null)}>סגירה</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={!!approveTarget} onClose={() => setApproveTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle>אישור בקשת הרשמה</DialogTitle>
@@ -209,6 +271,11 @@ export function RegistrationRequestsPage() {
             {approveTarget &&
               `לאשר את הבקשה של ${approveTarget.requestedData.firstName} ${approveTarget.requestedData.lastName}? תיווצר רשומת ${entityTypeLabel[approveTarget.entityType] ?? approveTarget.entityType}.`}
           </DialogContentText>
+          {approveTarget && approveTarget.requestedData.customFields.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              {renderCustomFields(approveTarget.entityType, approveTarget.requestedData.customFields)}
+            </Box>
+          )}
           <FormControlLabel
             control={
               <Checkbox

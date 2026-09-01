@@ -8,36 +8,44 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
-import Chip from '@mui/material/Chip';
-import { usersApi, participantsApi } from '../api/endpoints';
+import { usersApi, participantsApi, staffApi } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 import { useNotify } from '../context/NotificationContext';
-import type { Participant } from '../types';
+import { PublicCustomFieldsEditor } from '../components/PublicCustomFieldsEditor';
+import type { CustomFieldValue, PublicFieldMeta } from '../types';
+import { Role } from '../types';
 
 export function MyProfilePage() {
   const notify = useNotify();
   const [loading, setLoading] = useState(true);
   const [notLinked, setNotLinked] = useState(false);
-  const [participant, setParticipant] = useState<Participant | null>(null);
+  const [role, setRole] = useState<typeof Role.Participant | typeof Role.Staff | null>(null);
+  const [entityId, setEntityId] = useState<string | null>(null);
+  const [fields, setFields] = useState<PublicFieldMeta[]>([]);
   const [form, setForm] = useState({ firstName: '', lastName: '' });
+  const [customFields, setCustomFields] = useState<CustomFieldValue[]>([]);
   const [saving, setSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
     usersApi
       .me()
-      .then((me) => {
-        if (!me.participantId) {
+      .then(async (me) => {
+        const linkedId = me.role === Role.Staff ? me.staffId : me.participantId;
+        if (!linkedId) {
           setNotLinked(true);
-          return null;
+          return;
         }
-        return participantsApi.get(me.participantId);
-      })
-      .then((p) => {
-        if (p) {
-          setParticipant(p);
-          setForm({ firstName: p.firstName, lastName: p.lastName });
-        }
+        setRole(me.role === Role.Staff ? Role.Staff : Role.Participant);
+        setEntityId(linkedId);
+
+        const [entity, myFields] = await Promise.all([
+          me.role === Role.Staff ? staffApi.get(linkedId) : participantsApi.get(linkedId),
+          usersApi.getMyFields(),
+        ]);
+        setForm({ firstName: entity.firstName, lastName: entity.lastName });
+        setCustomFields(entity.customFields);
+        setFields(myFields);
       })
       .catch((err) => notify(getErrorMessage(err), 'error'))
       .finally(() => setLoading(false));
@@ -46,11 +54,16 @@ export function MyProfilePage() {
   useEffect(load, []);
 
   const handleSave = async () => {
-    if (!participant) return;
+    if (!entityId || !role) return;
     setSaving(true);
     try {
-      const updated = await participantsApi.update(participant._id, form);
-      setParticipant(updated);
+      const body = { ...form, customFields };
+      const updated =
+        role === Role.Staff
+          ? await staffApi.update(entityId, body)
+          : await participantsApi.update(entityId, body);
+      setForm({ firstName: updated.firstName, lastName: updated.lastName });
+      setCustomFields(updated.customFields);
       notify('הפרופיל עודכן בהצלחה', 'success');
     } catch (err) {
       notify(getErrorMessage(err), 'error');
@@ -68,19 +81,8 @@ export function MyProfilePage() {
           הפרופיל שלי
         </Typography>
         <Alert severity="info">
-          המשתמש שלך עדיין לא מקושר לרשומת משתתף. פני למנהל/ת המוסד.
+          המשתמש שלך עדיין לא מקושר לרשומה במערכת. פני/ה למנהל/ת המוסד.
         </Alert>
-      </Box>
-    );
-  }
-
-  if (!participant) {
-    return (
-      <Box>
-        <Typography variant="h4" sx={{ mb: 3 }}>
-          הפרופיל שלי
-        </Typography>
-        <Alert severity="error">לא הצלחנו לטעון את הפרופיל.</Alert>
       </Box>
     );
   }
@@ -104,6 +106,21 @@ export function MyProfilePage() {
             onChange={(e) => setForm({ ...form, lastName: e.target.value })}
             fullWidth
           />
+
+          {fields.length > 0 && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="subtitle2" color="text.secondary">
+                שדות נוספים
+              </Typography>
+              <PublicCustomFieldsEditor
+                fields={fields}
+                value={customFields}
+                onChange={setCustomFields}
+              />
+            </>
+          )}
+
           <Button
             variant="contained"
             onClick={handleSave}
@@ -112,23 +129,6 @@ export function MyProfilePage() {
           >
             שמירה
           </Button>
-
-          {participant.customFields.length > 0 && (
-            <>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="subtitle2" color="text.secondary">
-                שדות נוספים (תצוגה בלבד)
-              </Typography>
-              <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
-                {participant.customFields.map((f) => (
-                  <Chip key={f.k} label={`${f.k}: ${String(f.v)}`} />
-                ))}
-              </Stack>
-              <Typography variant="caption" color="text.secondary">
-                לעריכת שדות אלה — פני למנהל/ת המוסד.
-              </Typography>
-            </>
-          )}
         </Stack>
       </Paper>
     </Box>

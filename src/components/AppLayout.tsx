@@ -50,7 +50,7 @@ const navSections: NavSection[] = [
     title: 'ראשי',
     items: [
       { label: 'לוח בקרה', path: '/', icon: <DashboardIcon />, roles: [Role.Admin, Role.Staff, Role.Participant] },
-      { label: 'הפרופיל שלי', path: '/my-profile', icon: <PersonIcon />, roles: [Role.Participant] },
+      { label: 'הפרופיל שלי', path: '/my-profile', icon: <PersonIcon />, roles: [Role.Participant, Role.Staff] },
     ],
   },
   {

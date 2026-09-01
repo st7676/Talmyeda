@@ -41,7 +41,7 @@ function App() {
               <Route
                 path="/my-profile"
                 element={
-                  <ProtectedRoute roles={[Role.Participant]}>
+                  <ProtectedRoute roles={[Role.Participant, Role.Staff]}>
                     <MyProfilePage />
                   </ProtectedRoute>
                 }
