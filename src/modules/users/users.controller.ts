@@ -77,6 +77,17 @@ export class UsersController {
     );
   }
 
+  /**
+   * Any authenticated user (any role) reads their own User record — the only
+   * way the frontend can discover its own linked participantId/staffId,
+   * since those aren't in the JWT. Must precede the `:id` route below or
+   * Nest would match "me" as an :id param instead.
+   */
+  @Get('me')
+  findMe(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.findMe(user.userId);
+  }
+
   @Roles(Role.Admin)
   @Get(':id')
   findOne(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {

@@ -128,6 +128,22 @@ export class UsersService {
     return this.userModel.findOne({ _id: id, isDeleted: false }).exec();
   }
 
+  /**
+   * Self-service lookup for the currently authenticated user (any role),
+   * used by the frontend to discover its own linked participantId/staffId —
+   * neither is present in the JWT payload (spec 67: frequently-changing
+   * fields excluded from the token). Not institution-scoped by parameter
+   * since it's always the caller's own id from the JWT `sub` claim.
+   */
+  async findMe(id: string): Promise<UserDocument> {
+    const user = await this.userModel
+      .findOne({ _id: id, isDeleted: false })
+      .select('-passwordHash')
+      .exec();
+    if (!user) throw AppError.notFound('User not found', 'USER_NOT_FOUND');
+    return user;
+  }
+
   async findAll(
     institutionId: string,
     pagination: PaginationQueryDto,
