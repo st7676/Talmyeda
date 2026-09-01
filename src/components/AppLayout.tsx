@@ -65,7 +65,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'משתתפים', path: '/participants', icon: <GroupIcon />, roles: [Role.Admin, Role.Staff] },
       { label: 'צוות', path: '/staff', icon: <BadgeIcon />, roles: [Role.Admin] },
-      { label: 'קבוצות', path: '/groups', icon: <Diversity3Icon />, roles: [Role.Admin, Role.Staff, Role.Participant] },
+      { label: 'קבוצות', path: '/groups', icon: <Diversity3Icon />, roles: [Role.Admin, Role.Staff] },
       { label: 'בקשות הרשמה', path: '/registration-requests', icon: <HowToRegIcon />, roles: [Role.Admin] },
     ],
   },

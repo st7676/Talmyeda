@@ -63,7 +63,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="/groups" element={<GroupsPage />} />
+              <Route
+                path="/groups"
+                element={
+                  <ProtectedRoute roles={[Role.Admin, Role.Staff]}>
+                    <GroupsPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/registration-requests"
                 element={
