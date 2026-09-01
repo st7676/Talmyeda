@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
@@ -7,7 +7,6 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
-import Link from '@mui/material/Link';
 import Divider from '@mui/material/Divider';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../api/client';
@@ -71,22 +70,17 @@ export function LoginPage() {
           <Divider sx={{ my: 1 }} />
 
           {/*
-            Two deliberately separate paths — a real complaint fixed here:
-            this used to be a single "no institution yet? register" link
-            that a student/staff member with no login could click, landing
-            them on the *institution* signup form (creating a whole new
-            organization) instead of anywhere relevant to them. There is no
-            generic "join as student/staff" link possible from this page —
-            joining an existing institution requires that institution's own
-            shared /join link (see Settings), which isn't discoverable from
-            here by design (no public institution directory).
+            "רישום מוסד חדש" removed from here entirely — this login page is
+            shared by every audience (students, staff, and institution
+            admins alike), and the vast majority of visitors are students/
+            staff who should never see an "open a new institution" link.
+            Institution admins reach /register through a different channel
+            (still a live route, just not linked from here). Joining an
+            existing institution as student/staff still isn't linkable from
+            this generic page by design — it requires that institution's own
+            shared /join link (see Settings), since there's no public
+            institution directory to pick from.
           */}
-          <Typography variant="body2" sx={{ textAlign: 'center' }}>
-            פותחים מוסד חדש במערכת?{' '}
-            <Link component={RouterLink} to="/register">
-              רישום מוסד
-            </Link>
-          </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
             תלמיד/ה או איש/אשת צוות? יש לבקש מהמוסד שלכם את קישור ההרשמה האישי.
           </Typography>
