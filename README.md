@@ -1,7 +1,8 @@
 # Talmyeda Frontend
 
-פרונטנד React + TypeScript + MUI (Material Design) עבור [talmyeda-backend](../talmyeda-backend) —
-פלטפורמת SaaS רב-דיירותית לניהול מוסדות חינוך.
+פרונטנד React + TypeScript + MUI עבור [talmyeda-backend](../talmyeda-backend) —
+פלטפורמת SaaS רב-דיירותית לניהול מוסדות חינוך. ארוז גם כאפליקציית דסקטופ (Electron) —
+נפתח מאייקון על שולחן העבודה, לא כאתר בדפדפן.
 
 ## מה יש כאן
 
@@ -27,14 +28,32 @@ npm run dev
 
 ## פקודות
 
-- `npm run dev` — שרת פיתוח
+- `npm run dev` — שרת פיתוח (דפדפן, ל-hot reload מהיר בזמן עבודה על הקוד)
 - `npm run build` — בדיקת טיפוסים (`tsc -b`) + build לפרודקשן
 - `npm run lint` — oxlint
 - `npm run preview` — הרצת build לוקאלית
+- `npm run electron:dev` — מריץ את האפליקציה כחלון דסקטופ (Electron) מול קוד המקור, עם hot reload
+- `npm run electron:build` — בונה קובץ התקנה (`.exe`, NSIS) לתיקיית `release/` — כולל אייקון על שולחן העבודה ותפריט Start
+
+## התקנה כאפליקציית דסקטופ
+
+```bash
+npm run electron:build
+```
+
+זה מייצר מתקין ב-`release/` (למשל `תלמידה Setup 0.0.0.exe`). הרצת המתקין יוצרת קיצור דרך על
+שולחן העבודה ובתפריט ההתחלה — פתיחה כמו כל תוכנה אחרת, לא דרך דפדפן. האפליקציה עדיין מתחברת
+לבקאנד דרך הרשת (HTTP רגיל) בדיוק כמו בגרסת הדפדפן — רק החלון עצמו הוא native.
+כתובת ה-API נקבעת לפי `VITE_API_URL` **בזמן ה-build**, כך שיש לוודא ש-`.env` מצביע לכתובת
+הבקאנד הנכונה (production/staging/local) לפני `electron:build`.
 
 ## מבנה
 
 ```
+electron/
+  main.cjs      תהליך ה-Electron הראשי — פותח חלון דסקטופ שטוען את ה-React app
+build/
+  icon.png      אייקון האפליקציה (מומר אוטומטית ל-.ico ע"י electron-builder)
 src/
   api/          קליינט axios + כל קריאות ה-API לפי מודול בבקאנד
   components/   קומפוננטות משותפות (טבלה, עורך שדות דינמיים, דיאלוג אישור, שלד אפליקציה)
