@@ -14,6 +14,7 @@ import type {
   AccountStatus,
   RegistrationRequestStatus,
   ParticipantUserMode,
+  InstitutionStatus,
 } from '../types';
 
 // ---------- Auth ----------
@@ -41,6 +42,22 @@ export const institutionsApi = {
     allowMultipleGroups?: boolean;
     staffGroupManagementEnabled?: boolean;
   }) => api.put('/institutions/settings', body).then((r) => r.data.data),
+};
+
+// ---------- Platform (SUPER_ADMIN only) ----------
+export const platformApi = {
+  listInstitutions: (params: { status?: InstitutionStatus; page?: number; limit?: number }) =>
+    api
+      .get<{ data: Paginated<Institution> }>('/platform/institutions', { params })
+      .then((r) => r.data.data),
+  approve: (id: string) =>
+    api.post(`/platform/institutions/${id}/approve`).then((r) => r.data.data),
+  suspend: (id: string) =>
+    api.post(`/platform/institutions/${id}/suspend`).then((r) => r.data.data),
+  reactivate: (id: string) =>
+    api.post(`/platform/institutions/${id}/reactivate`).then((r) => r.data.data),
+  reject: (id: string) =>
+    api.post(`/platform/institutions/${id}/reject`).then((r) => r.data.data),
 };
 
 // ---------- Users ----------

@@ -15,6 +15,7 @@ import { RegistrationRequestsPage } from './pages/RegistrationRequestsPage';
 import { FieldDefinitionsPage } from './pages/FieldDefinitionsPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PlatformInstitutionsPage } from './pages/PlatformInstitutionsPage';
 import { Role } from './types';
 
 function App() {
@@ -89,6 +90,14 @@ function App() {
                 element={
                   <ProtectedRoute roles={[Role.Admin]}>
                     <SettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/platform/institutions"
+                element={
+                  <ProtectedRoute roles={[Role.SuperAdmin]}>
+                    <PlatformInstitutionsPage />
                   </ProtectedRoute>
                 }
               />

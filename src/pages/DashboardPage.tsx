@@ -13,11 +13,13 @@ import HowToRegIcon from '@mui/icons-material/HowToReg';
 import TuneIcon from '@mui/icons-material/Tune';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import SettingsIcon from '@mui/icons-material/Settings';
+import DomainIcon from '@mui/icons-material/Domain';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
 import type { ReactNode } from 'react';
 
 const cards: { label: string; desc: string; path: string; icon: ReactNode; roles: Role[] }[] = [
+  { label: 'מוסדות', desc: 'אישור/השעיה של מוסדות בפלטפורמה', path: '/platform/institutions', icon: <DomainIcon fontSize="large" />, roles: [Role.SuperAdmin] },
   { label: 'הפרופיל שלי', desc: 'צפייה ועדכון הפרטים שלך', path: '/my-profile', icon: <PersonIcon fontSize="large" />, roles: [Role.Participant] },
   { label: 'משתתפים', desc: 'ניהול משתתפי המוסד', path: '/participants', icon: <GroupIcon fontSize="large" />, roles: [Role.Admin, Role.Staff] },
   { label: 'צוות', desc: 'ניהול אנשי הצוות', path: '/staff', icon: <BadgeIcon fontSize="large" />, roles: [Role.Admin] },

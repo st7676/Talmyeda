@@ -25,6 +25,7 @@ import HowToRegIcon from '@mui/icons-material/HowToReg';
 import TuneIcon from '@mui/icons-material/Tune';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import SettingsIcon from '@mui/icons-material/Settings';
+import DomainIcon from '@mui/icons-material/Domain';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
@@ -67,6 +68,17 @@ const navSections: NavSection[] = [
       { label: 'שדות מותאמים', path: '/field-definitions', icon: <TuneIcon />, roles: [Role.Admin] },
       { label: 'משתמשים', path: '/users', icon: <ManageAccountsIcon />, roles: [Role.Admin] },
       { label: 'הגדרות מוסד', path: '/settings', icon: <SettingsIcon />, roles: [Role.Admin] },
+    ],
+  },
+  {
+    title: 'ניהול פלטפורמה',
+    items: [
+      {
+        label: 'מוסדות',
+        path: '/platform/institutions',
+        icon: <DomainIcon />,
+        roles: [Role.SuperAdmin],
+      },
     ],
   },
 ];
