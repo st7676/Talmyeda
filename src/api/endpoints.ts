@@ -17,6 +17,7 @@ import type {
   RegistrationRequestStatus,
   ParticipantUserMode,
   InstitutionStatus,
+  PublicFieldMeta,
 } from '../types';
 
 // ---------- Auth ----------
@@ -162,10 +163,18 @@ export const staffGroupsApi = {
 export const registrationRequestsApi = {
   submit: (body: {
     institutionId: string;
+    entityType?: FieldEntityType;
     firstName: string;
     lastName: string;
     customFields?: CustomFieldValue[];
   }) => api.post('/registration-requests', body).then((r) => r.data.data),
+  /** GET /registration-requests/fields — public, unauthenticated. */
+  getPublicFields: (institutionId: string, entityType: FieldEntityType) =>
+    api
+      .get<{ data: PublicFieldMeta[] }>('/registration-requests/fields', {
+        params: { institutionId, entityType },
+      })
+      .then((r) => r.data.data),
   list: (params: ListParams & { status?: RegistrationRequestStatus }) =>
     api
       .get<{ data: Paginated<RegistrationRequest> }>('/registration-requests', { params })

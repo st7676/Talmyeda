@@ -14,7 +14,7 @@ import { registrationRequestsApi } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 import { useNotify } from '../context/NotificationContext';
 import type { RegistrationRequest } from '../types';
-import { RegistrationRequestStatus } from '../types';
+import { RegistrationRequestStatus, FieldEntityType } from '../types';
 
 const statusColor: Record<RegistrationRequestStatus, 'warning' | 'success' | 'error'> = {
   [RegistrationRequestStatus.Pending]: 'warning',
@@ -26,6 +26,11 @@ const statusLabel: Record<RegistrationRequestStatus, string> = {
   [RegistrationRequestStatus.Pending]: 'ממתין',
   [RegistrationRequestStatus.Approved]: 'אושר',
   [RegistrationRequestStatus.Rejected]: 'נדחה',
+};
+
+const entityTypeLabel: Partial<Record<FieldEntityType, string>> = {
+  [FieldEntityType.Participant]: 'תלמיד/ה',
+  [FieldEntityType.Staff]: 'איש/אשת צוות',
 };
 
 export function RegistrationRequestsPage() {
@@ -80,6 +85,13 @@ export function RegistrationRequestsPage() {
   const columns: Column<RegistrationRequest>[] = [
     { key: 'firstName', label: 'שם פרטי', render: (r) => r.requestedData.firstName },
     { key: 'lastName', label: 'שם משפחה', render: (r) => r.requestedData.lastName },
+    {
+      key: 'entityType',
+      label: 'סוג',
+      render: (r) => (
+        <Chip size="small" variant="outlined" label={entityTypeLabel[r.entityType] ?? r.entityType} />
+      ),
+    },
     {
       key: 'status',
       label: 'סטטוס',
@@ -157,7 +169,7 @@ export function RegistrationRequestsPage() {
         title="אישור בקשת הרשמה"
         description={
           approveTarget
-            ? `לאשר את הבקשה של ${approveTarget.requestedData.firstName} ${approveTarget.requestedData.lastName}? תיווצר רשומת משתתף.`
+            ? `לאשר את הבקשה של ${approveTarget.requestedData.firstName} ${approveTarget.requestedData.lastName}? תיווצר רשומת ${entityTypeLabel[approveTarget.entityType] ?? approveTarget.entityType}.`
             : ''
         }
         confirmLabel="אישור"

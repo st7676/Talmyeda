@@ -122,6 +122,7 @@ export interface RegistrationRequest {
   _id: string;
   institutionId: string;
   status: RegistrationRequestStatus;
+  entityType: FieldEntityType;
   requestedData: {
     firstName: string;
     lastName: string;
@@ -129,6 +130,20 @@ export interface RegistrationRequest {
   };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PublicFieldOption {
+  label: string;
+  value: string;
+}
+
+/** GET /registration-requests/fields — public, unauthenticated. */
+export interface PublicFieldMeta {
+  internalKey: string;
+  displayName: string;
+  fieldType: FieldType;
+  required: boolean;
+  options?: PublicFieldOption[];
 }
 
 export interface RolePermission {
