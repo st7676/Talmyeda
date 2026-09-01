@@ -3,10 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { FieldEntityType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
-import { PaginatedResult } from '../../common/interfaces';
+import { AuthenticatedUser, PaginatedResult } from '../../common/interfaces';
 import { escapeRegex } from '../../common/utils/regex.util';
 import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { DynamicQueryService } from '../dynamic-fields/dynamic-query.service';
+import { UsersService } from '../users/users.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { QueryStaffDto } from './dto/query-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
@@ -21,6 +22,7 @@ export class StaffService {
     @InjectModel(Staff.name) private readonly staffModel: Model<StaffDocument>,
     private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
     private readonly dynamicQueryService: DynamicQueryService,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(
@@ -84,33 +86,38 @@ export class StaffService {
     return { items, page, limit, total };
   }
 
+  /**
+   * GET /staff/:id. Now self-scoped for STAFF too (previously Admin-only —
+   * a STAFF-role user had zero access to their own record, unlike
+   * Participant which already supported self-view/edit). Same pattern as
+   * ParticipantsService: findOneRaw() enforces access, then results go
+   * through the same field-level READ filtering as an Admin's view.
+   */
   async findOne(
     id: string,
-    institutionId: string,
-    actingRole: Role = Role.Admin,
+    user: AuthenticatedUser,
   ): Promise<Record<string, unknown>> {
-    const staff = await this.staffModel
-      .findOne({ _id: id, institutionId, isDeleted: false })
-      .exec();
-    if (!staff) throw AppError.notFound('Staff not found', 'STAFF_NOT_FOUND');
+    const staff = await this.findOneRaw(id, user);
     const viewableKeys = await this.dynamicFieldsValidator.getViewableKeys(
-      institutionId,
+      this.requireInstitution(user),
       FieldEntityType.Staff,
-      actingRole,
+      user.role,
     );
     return this.toReadable(staff, viewableKeys);
   }
 
+  /** PUT /staff/:id. Self-scoped for STAFF (see findOne); field write-permission still enforced per field. */
   async update(
     id: string,
-    institutionId: string,
+    user: AuthenticatedUser,
     dto: UpdateStaffDto,
-    actingRole: Role = Role.Admin,
   ): Promise<Record<string, unknown>> {
+    await this.findOneRaw(id, user);
+    const institutionId = this.requireInstitution(user);
     await this.dynamicFieldsValidator.validate({
       institutionId,
       entityType: FieldEntityType.Staff,
-      role: actingRole,
+      role: user.role,
       customFields: dto.customFields,
     });
     const staff = await this.staffModel
@@ -124,9 +131,49 @@ export class StaffService {
     const viewableKeys = await this.dynamicFieldsValidator.getViewableKeys(
       institutionId,
       FieldEntityType.Staff,
-      actingRole,
+      user.role,
     );
     return this.toReadable(staff, viewableKeys);
+  }
+
+  /** Internal fetch with access check — used by findOne/update. */
+  private async findOneRaw(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<StaffDocument> {
+    const institutionId = this.requireInstitution(user);
+    const staff = await this.staffModel
+      .findOne({ _id: id, institutionId, isDeleted: false })
+      .exec();
+    if (!staff) throw AppError.notFound('Staff not found', 'STAFF_NOT_FOUND');
+    if (user.role === Role.Staff) {
+      const ownId = await this.resolveOwnStaffId(user);
+      if (!ownId || ownId !== staff._id.toString()) {
+        throw AppError.forbidden(
+          'Can only access your own record',
+          'OUT_OF_SCOPE',
+        );
+      }
+    }
+    return staff;
+  }
+
+  /** Resolves the Staff record linked to a STAFF-role User (mirrors resolveOwnParticipantId). */
+  private async resolveOwnStaffId(
+    user: AuthenticatedUser,
+  ): Promise<string | null> {
+    const record = await this.usersService.findByIdForAuth(user.userId);
+    return record?.staffId ? record.staffId.toString() : null;
+  }
+
+  private requireInstitution(user: AuthenticatedUser): string {
+    if (!user.institutionId) {
+      throw AppError.forbidden(
+        'Action requires an institution-scoped user',
+        'NO_INSTITUTION',
+      );
+    }
+    return user.institutionId;
   }
 
   /**

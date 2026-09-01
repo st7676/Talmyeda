@@ -240,6 +240,25 @@ export class UsersService {
     await user.save();
   }
 
+  /**
+   * Public existence check, used by callers that need to pick a free
+   * username themselves (e.g. auto-generating one from a person's real name
+   * on registration-request approval, with a numeric suffix on collision).
+   */
+  async usernameExists(
+    institutionId: Types.ObjectId | string | null,
+    username: string,
+  ): Promise<boolean> {
+    const existing = await this.userModel
+      .findOne({
+        institutionId: institutionId ?? null,
+        username,
+        isDeleted: false,
+      })
+      .exec();
+    return !!existing;
+  }
+
   private async assertUsernameFree(
     institutionId: Types.ObjectId | string | null,
     username: string,

@@ -74,6 +74,14 @@ export class CaslAbilityFactory {
         can('update', 'Participant');
         can('read', 'RegistrationRequest');
         can('create', 'RegistrationRequest');
+        // Only their own Staff record — same self-only pattern as
+        // Role.Participant below (enforced by StaffService comparing the
+        // JWT-resolved staffId, CASL can't see that). Not currently
+        // @CheckAbility-gated on the Staff controller (only @Roles), listed
+        // here for accuracy/consistency with how every other role's real
+        // capabilities are documented in this factory.
+        can('read', 'Staff');
+        can('update', 'Staff');
         break;
 
       case Role.Participant:

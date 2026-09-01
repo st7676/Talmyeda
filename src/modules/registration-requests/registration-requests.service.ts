@@ -1,21 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import {
-  FieldEntityType,
-  FieldType,
-  InstitutionStatus,
-  Role,
-} from '../../common/enums';
+import { FieldEntityType, InstitutionStatus, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { PaginatedResult } from '../../common/interfaces';
-import {
-  generateTempPassword,
-  hashPassword,
-} from '../../common/utils/password.util';
+import { hashPassword } from '../../common/utils/password.util';
 import { DynamicFieldsValidatorService } from '../dynamic-fields/dynamic-fields-validator.service';
 import { FieldDefinitionsService } from '../field-definitions/field-definitions.service';
-import { FieldOptionsService } from '../field-options/field-options.service';
 import { InstitutionsService } from '../institutions/institutions.service';
 import { ParticipantUserMode } from '../institutions/schemas/institution-settings.schema';
 import { ParticipantsService } from '../participants/participants.service';
@@ -43,7 +34,7 @@ export interface PublicFieldMeta {
 /** entityType -> the Role whose FieldDefinition.permissions apply to self-edit. */
 function selfRoleFor(
   entityType: FieldEntityType.Participant | FieldEntityType.Staff,
-): Role {
+): Role.Participant | Role.Staff {
   return entityType === FieldEntityType.Staff ? Role.Staff : Role.Participant;
 }
 
@@ -58,7 +49,6 @@ export class RegistrationRequestsService {
     private readonly usersService: UsersService,
     private readonly dynamicFieldsValidator: DynamicFieldsValidatorService,
     private readonly fieldDefinitionsService: FieldDefinitionsService,
-    private readonly fieldOptionsService: FieldOptionsService,
   ) {}
 
   /**
@@ -145,40 +135,13 @@ export class RegistrationRequestsService {
     query: PublicFieldsQueryDto,
   ): Promise<PublicFieldMeta[]> {
     await this.assertSelfRegistrationOpen(query.institutionId);
-    const role = selfRoleFor(query.entityType);
-
-    const definitions = await this.fieldDefinitionsService.findActiveForEntity(
+    // Shared with the authenticated "edit my profile" endpoint
+    // (GET /users/me/fields) — see FieldDefinitionsService for the identical
+    // self-edit-permission logic factored out from here.
+    return this.fieldDefinitionsService.findSelfEditableFields(
       query.institutionId,
       query.entityType,
-    );
-
-    const editable = definitions.filter((d) => {
-      const rolePermission =
-        role === Role.Staff ? d.permissions.staff : d.permissions.participant;
-      return rolePermission?.edit !== false;
-    });
-
-    return Promise.all(
-      editable.map(async (d) => {
-        const isSelect =
-          d.fieldType === FieldType.Select ||
-          d.fieldType === FieldType.MultiSelect;
-        const options = isSelect
-          ? (
-              await this.fieldOptionsService.findForField(
-                query.institutionId,
-                d._id.toString(),
-              )
-            ).map((o) => ({ label: o.label, value: o.value }))
-          : undefined;
-        return {
-          internalKey: d.internalKey,
-          displayName: d.displayName,
-          fieldType: d.fieldType,
-          required: d.required,
-          options,
-        };
-      }),
+      selfRoleFor(query.entityType),
     );
   }
 
@@ -325,8 +288,19 @@ export class RegistrationRequestsService {
     role: Role,
     link: { participantId?: Types.ObjectId; staffId?: Types.ObjectId },
   ): Promise<{ username: string; tempPassword: string }> {
-    const username = this.generateUsername(firstName, lastName);
-    const tempPassword = generateTempPassword();
+    const username = await this.generateUsername(
+      institutionId,
+      firstName,
+      lastName,
+    );
+    // Temp password = first+last name concatenated, no separator (explicit
+    // product decision, same reasoning as the username: memorable over
+    // secure-by-obscurity for this onboarding step). This is genuinely
+    // guessable by anyone who knows the person's name — mustChangePassword
+    // below is what actually keeps the account safe, forcing a real secret
+    // to be set before anything else works (enforced globally by
+    // MustChangePasswordGuard, not just a UI nicety).
+    const tempPassword = `${firstName}${lastName}`;
     const passwordHash = await hashPassword(tempPassword);
     await this.usersService.createRaw({
       institutionId,
@@ -336,12 +310,6 @@ export class RegistrationRequestsService {
       ...link,
       mustChangePassword: true,
     });
-    // Bug fixed here: this used to return only the password, discarding the
-    // generated username — the caller (and therefore the API response, and
-    // therefore the frontend) had no way to tell the approving Admin what
-    // username the new login actually got, making the returned tempPassword
-    // useless on its own. Found while auditing "how does an approved
-    // participant/staff actually log in".
     return { username, tempPassword };
   }
 
@@ -374,12 +342,31 @@ export class RegistrationRequestsService {
     return request;
   }
 
-  private generateUsername(firstName: string, lastName: string): string {
-    const base = `${firstName}.${lastName}`
-      .toLowerCase()
-      .normalize('NFKD')
-      .replace(/[^a-z0-9.]/g, '');
-    const suffix = Math.random().toString(36).slice(2, 6);
-    return `${base || 'participant'}.${suffix}`;
+  /**
+   * Username = the person's real name ("שם המשתמש יהיה השם של המשתמש" —
+   * explicit product decision, prioritizing something a student/staff
+   * member will actually remember over machine-generated obscurity).
+   *
+   * Bug fixed here as a side effect: the old scheme lowercased and stripped
+   * everything outside [a-z0-9.], which silently discarded Hebrew entirely
+   * — every Hebrew-named registrant landed on the "participant.xxxx"
+   * fallback with no trace of their real name. Not caught earlier because
+   * every login created via this flow in this session used ASCII test
+   * names. Institution-scoped uniqueness still enforced (a numeric suffix
+   * is appended only on an actual collision, not by default).
+   */
+  private async generateUsername(
+    institutionId: string,
+    firstName: string,
+    lastName: string,
+  ): Promise<string> {
+    const base = `${firstName} ${lastName}`.trim() || 'user';
+    let candidate = base;
+    let attempt = 2;
+    while (await this.usersService.usernameExists(institutionId, candidate)) {
+      candidate = `${base} ${attempt}`;
+      attempt += 1;
+    }
+    return candidate;
   }
 }

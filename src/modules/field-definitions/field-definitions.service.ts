@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { randomBytes } from 'crypto';
-import { FieldEntityType, FieldType } from '../../common/enums';
+import { FieldEntityType, FieldType, Role } from '../../common/enums';
 import { AppError } from '../../common/errors/app-error';
 import { PaginatedResult } from '../../common/interfaces';
 import { isValueCompatibleWithType } from '../../common/utils/field-value.util';
@@ -25,6 +25,15 @@ import {
 interface CustomFieldsHolder {
   _id: Types.ObjectId;
   customFields: { k: string; v: unknown }[];
+}
+
+/** Field metadata safe to hand to a non-admin caller rendering their own edit form. */
+export interface SelfEditableFieldMeta {
+  internalKey: string;
+  displayName: string;
+  fieldType: FieldType;
+  required: boolean;
+  options?: { label: string; value: string }[];
 }
 
 @Injectable()
@@ -84,6 +93,55 @@ export class FieldDefinitionsService {
   /** Every active field definition for an entity type, unpaginated — used by validation logic. */
   findActiveForEntity(institutionId: string, entityType: FieldEntityType) {
     return this.fieldDefinitionModel.find({ institutionId, entityType }).exec();
+  }
+
+  /**
+   * Field metadata a Participant/Staff member is allowed to self-edit on
+   * their own record, with Select/MultiSelect options inlined so the caller
+   * doesn't need a second (admin-gated) call to GET /field-options. Shared
+   * by two callers that need the identical permission logic: the public
+   * self-registration form (RegistrationRequestsService.getPublicFields,
+   * institutionId from an unauthenticated request body) and the
+   * authenticated "edit my profile" endpoint (GET /users/me/fields,
+   * institutionId from the caller's own JWT).
+   */
+  async findSelfEditableFields(
+    institutionId: string,
+    entityType: FieldEntityType.Participant | FieldEntityType.Staff,
+    role: Role.Participant | Role.Staff,
+  ): Promise<SelfEditableFieldMeta[]> {
+    const definitions = await this.findActiveForEntity(
+      institutionId,
+      entityType,
+    );
+    const editable = definitions.filter((d) => {
+      const rolePermission =
+        role === Role.Staff ? d.permissions.staff : d.permissions.participant;
+      return rolePermission?.edit !== false;
+    });
+
+    return Promise.all(
+      editable.map(async (d) => {
+        const isSelect =
+          d.fieldType === FieldType.Select ||
+          d.fieldType === FieldType.MultiSelect;
+        const options = isSelect
+          ? (
+              await this.fieldOptionsService.findForField(
+                institutionId,
+                d._id.toString(),
+              )
+            ).map((o) => ({ label: o.label, value: o.value }))
+          : undefined;
+        return {
+          internalKey: d.internalKey,
+          displayName: d.displayName,
+          fieldType: d.fieldType,
+          required: d.required,
+          options,
+        };
+      }),
+    );
   }
 
   async findOne(

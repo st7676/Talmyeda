@@ -46,27 +46,28 @@ export class StaffController {
     );
   }
 
+  /**
+   * Self-view added here: previously Admin-only, meaning a STAFF-role user
+   * had no way at all to see their own record — unlike Participant, which
+   * already supported self-view/edit. Access to a *specific* record (own
+   * vs. someone else's) is enforced in StaffService.findOneRaw, same
+   * pattern as ParticipantsService.
+   */
+  @Roles(Role.Admin, Role.Staff)
   @Get(':id')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.staffService.findOne(
-      id,
-      this.requireInstitution(user),
-      user.role,
-    );
+    return this.staffService.findOne(id, user);
   }
 
+  /** Self-edit added here for the same reason as findOne above. */
+  @Roles(Role.Admin, Role.Staff)
   @Put(':id')
   update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateStaffDto,
   ) {
-    return this.staffService.update(
-      id,
-      this.requireInstitution(user),
-      dto,
-      user.role,
-    );
+    return this.staffService.update(id, user, dto);
   }
 
   @Delete(':id')
