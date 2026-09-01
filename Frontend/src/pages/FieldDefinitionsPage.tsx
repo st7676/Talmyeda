@@ -15,6 +15,7 @@ import IconButton from '@mui/material/IconButton';
 import Chip from '@mui/material/Chip';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
+import Divider from '@mui/material/Divider';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
@@ -47,10 +48,32 @@ const fieldTypeLabels: Record<FieldType, string> = {
   [FieldType.MultiSelect]: 'רשימה מרובת בחירה',
 };
 
+interface FieldPermissionsForm {
+  staffView: boolean;
+  staffEdit: boolean;
+  participantView: boolean;
+  participantEdit: boolean;
+}
+
+/**
+ * Default: everyone can see it, but only staff/admin can fill it in — the
+ * safer default for a brand-new field (matches "שדות שרק המורה או המנהל
+ * יכולים להוסיף", the actual ask this whole section exists for). Admin can
+ * still open these up to participant self-edit per field when that's
+ * actually wanted.
+ */
+const defaultPermissions: FieldPermissionsForm = {
+  staffView: true,
+  staffEdit: true,
+  participantView: true,
+  participantEdit: false,
+};
+
 const emptyForm = {
   displayName: '',
   fieldType: FieldType.Text as FieldType,
   required: false,
+  permissions: defaultPermissions,
 };
 
 export function FieldDefinitionsPage() {
@@ -85,9 +108,24 @@ export function FieldDefinitionsPage() {
 
   const openEdit = (f: FieldDefinition) => {
     setEditing(f);
-    setForm({ displayName: f.displayName, fieldType: f.fieldType, required: f.required });
+    setForm({
+      displayName: f.displayName,
+      fieldType: f.fieldType,
+      required: f.required,
+      permissions: {
+        staffView: f.permissions?.staff?.view ?? true,
+        staffEdit: f.permissions?.staff?.edit ?? true,
+        participantView: f.permissions?.participant?.view ?? true,
+        participantEdit: f.permissions?.participant?.edit ?? false,
+      },
+    });
     setDialogOpen(true);
   };
+
+  const permissionsPayload = () => ({
+    staff: { view: form.permissions.staffView, edit: form.permissions.staffEdit },
+    participant: { view: form.permissions.participantView, edit: form.permissions.participantEdit },
+  });
 
   const handleSave = async () => {
     setSaving(true);
@@ -97,6 +135,7 @@ export function FieldDefinitionsPage() {
           displayName: form.displayName,
           required: form.required,
           confirmRequiredChange: true,
+          permissions: permissionsPayload(),
         });
         notify('השדה עודכן בהצלחה', 'success');
       } else {
@@ -105,6 +144,7 @@ export function FieldDefinitionsPage() {
           entityType: tab,
           fieldType: form.fieldType,
           required: form.required,
+          permissions: permissionsPayload(),
         });
         notify('השדה נוצר בהצלחה', 'success');
       }
@@ -137,6 +177,16 @@ export function FieldDefinitionsPage() {
       render: (r) => <Chip size="small" label={fieldTypeLabels[r.fieldType]} />,
     },
     { key: 'required', label: 'חובה', render: (r) => (r.required ? 'כן' : 'לא') },
+    {
+      key: 'whoCanFill',
+      label: 'מי יכול למלא',
+      render: (r) =>
+        r.permissions?.participant?.edit ? (
+          <Chip size="small" color="default" label="גם משתתף" />
+        ) : (
+          <Chip size="small" color="warning" label="צוות/מנהל בלבד" />
+        ),
+    },
   ];
 
   const isSelectType = form.fieldType === FieldType.Select || form.fieldType === FieldType.MultiSelect;
@@ -218,6 +268,80 @@ export function FieldDefinitionsPage() {
               }
               label="שדה חובה"
             />
+
+            <Divider />
+            <Typography variant="subtitle2">מי רשאי לגעת בשדה הזה?</Typography>
+
+            {tab === FieldEntityType.Participant && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.permissions.participantEdit}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          permissions: { ...form.permissions, participantEdit: e.target.checked },
+                        })
+                      }
+                    />
+                  }
+                  label="המשתתף/ת יכול/ה למלא בעצמו/ה (כיבוי = רק צוות/מנהל יכולים להוסיף)"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.permissions.participantView}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          permissions: { ...form.permissions, participantView: e.target.checked },
+                        })
+                      }
+                    />
+                  }
+                  label="המשתתף/ת יכול/ה לראות את השדה"
+                />
+              </>
+            )}
+            {tab === FieldEntityType.Staff && (
+              <>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.permissions.staffEdit}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          permissions: { ...form.permissions, staffEdit: e.target.checked },
+                        })
+                      }
+                    />
+                  }
+                  label="איש/אשת הצוות יכול/ה למלא בעצמו/ה (כיבוי = רק מנהל יכול להוסיף)"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.permissions.staffView}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          permissions: { ...form.permissions, staffView: e.target.checked },
+                        })
+                      }
+                    />
+                  }
+                  label="איש/אשת הצוות יכול/ה לראות את השדה"
+                />
+              </>
+            )}
+            {tab === FieldEntityType.Group && (
+              <Typography variant="body2" color="text.secondary">
+                שדות של קבוצות ניתנים לעריכה ע"י מנהל בלבד.
+              </Typography>
+            )}
+
             {isSelectType && !editing && (
               <Typography variant="body2" color="text.secondary">
                 לאחר יצירת השדה ניתן להוסיף אפשרויות בחירה דרך אייקון הרשימה בטבלה.

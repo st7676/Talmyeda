@@ -16,6 +16,7 @@ import Divider from '@mui/material/Divider';
 import Avatar from '@mui/material/Avatar';
 import Tooltip from '@mui/material/Tooltip';
 import MenuIcon from '@mui/icons-material/Menu';
+import HomeIcon from '@mui/icons-material/Home';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
 import GroupIcon from '@mui/icons-material/Group';
@@ -128,6 +129,11 @@ export function AppLayout() {
           {claims && (
             <Chip label={roleLabel[claims.role]} color="secondary" size="small" sx={{ ml: 2 }} />
           )}
+          <Tooltip title="מסך הבית">
+            <IconButton color="inherit" onClick={() => navigate('/')}>
+              <HomeIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="התנתקות">
             <IconButton color="inherit" onClick={handleLogout}>
               <LogoutIcon />
@@ -211,6 +217,17 @@ export function AppLayout() {
         sx={{
           flexGrow: 1,
           p: 3,
+          minWidth: 0,
+          // Real bug fixed here: MUI's persistent Drawer is internally
+          // position:fixed even in "persistent" mode — it does NOT push
+          // sibling content via normal flex layout the way its name might
+          // suggest. The transition was already declared, but the actual
+          // margin value was never set based on `open`, so the drawer's
+          // 250px-wide panel sat directly on top of the main content
+          // whenever it was open, covering the right-hand edge of every
+          // page's text (list rows, form fields, etc.) — anchor="right"
+          // for RTL means the overlap happens on marginRight, not left.
+          mr: open ? `${drawerWidth}px` : 0,
           transition: (t) => t.transitions.create('margin', { duration: t.transitions.duration.short }),
         }}
       >
