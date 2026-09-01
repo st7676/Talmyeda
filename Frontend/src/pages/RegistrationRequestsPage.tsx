@@ -21,6 +21,8 @@ import IconButton from '@mui/material/IconButton';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import Tooltip from '@mui/material/Tooltip';
 import { DataTable, type Column } from '../components/DataTable';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { registrationRequestsApi } from '../api/endpoints';
@@ -158,7 +160,20 @@ export function RegistrationRequestsPage() {
   };
 
   const columns: Column<RegistrationRequest>[] = [
-    { key: 'firstName', label: 'שם פרטי', render: (r) => r.requestedData.firstName },
+    {
+      key: 'firstName',
+      label: 'שם פרטי',
+      render: (r) => (
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          {r.possibleDuplicate && (
+            <Tooltip title="כבר קיימת רשומה מאושרת בשם זהה במוסד — ייתכן שזה אותו אדם, וייתכן ששני אנשים שונים">
+              <WarningAmberIcon color="warning" fontSize="small" />
+            </Tooltip>
+          )}
+          <span>{r.requestedData.firstName}</span>
+        </Stack>
+      ),
+    },
     { key: 'lastName', label: 'שם משפחה', render: (r) => r.requestedData.lastName },
     {
       key: 'entityType',
@@ -256,6 +271,12 @@ export function RegistrationRequestsPage() {
             סוג: {viewTarget && (entityTypeLabel[viewTarget.entityType] ?? viewTarget.entityType)} ·
             סטטוס: {viewTarget && statusLabel[viewTarget.status]}
           </Typography>
+          {viewTarget?.possibleDuplicate && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              כבר קיימת רשומה מאושרת עם שם זהה במוסד. ייתכן שזה אותו אדם שמנסה להירשם שוב (למשל
+              כי שכח סיסמה), וייתכן ששני אנשים שונים באמת בעלי אותו שם — כדאי לבדוק לפני אישור.
+            </Alert>
+          )}
           {viewTarget &&
             renderCustomFields(viewTarget.entityType, viewTarget.requestedData.customFields)}
         </DialogContent>
@@ -271,6 +292,11 @@ export function RegistrationRequestsPage() {
             {approveTarget &&
               `לאשר את הבקשה של ${approveTarget.requestedData.firstName} ${approveTarget.requestedData.lastName}? תיווצר רשומת ${entityTypeLabel[approveTarget.entityType] ?? approveTarget.entityType}.`}
           </DialogContentText>
+          {approveTarget?.possibleDuplicate && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              כבר קיימת רשומה מאושרת עם שם זהה במוסד — כדאי לוודא שזה לא כפילות לפני האישור.
+            </Alert>
+          )}
           {approveTarget && approveTarget.requestedData.customFields.length > 0 && (
             <Box sx={{ mb: 2 }}>
               {renderCustomFields(approveTarget.entityType, approveTarget.requestedData.customFields)}

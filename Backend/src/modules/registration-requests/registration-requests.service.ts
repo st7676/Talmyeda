@@ -81,44 +81,34 @@ export class RegistrationRequestsService {
   }
 
   /**
-   * Two duplicate cases, checked in order of likelihood:
-   * 1. Someone with this exact name is already an approved Participant/
-   *    Staff member of this institution — most likely they already went
-   *    through this once and forgot their login, not a genuine second
-   *    person who happens to share a name.
-   * 2. There's already a Pending request with this exact name/entityType —
-   *    most likely an accidental double-submit, not a race between two
-   *    different people.
-   * Exact (case-insensitive, trimmed) match only — not fuzzy/typo-tolerant,
-   * so two unrelated people who legitimately share a name will still both
-   * get through and land in front of an Admin to sort out manually, same
-   * as before this existed.
+   * Two duplicate cases, handled differently based on false-positive risk:
+   *
+   * 1. There's already a Pending request with this exact name/entityType ->
+   *    hard block (throws). Same institution, same name, same entity type,
+   *    BOTH pending at once — realistically almost always an accidental
+   *    double-submit (double-click, resubmitting after not hearing back),
+   *    not two different people racing each other. Low enough false-
+   *    positive risk to reject outright.
+   *
+   * 2. Someone with this exact name is already an *approved* Participant/
+   *    Staff member of this institution -> soft flag only (returns
+   *    `true`, doesn't throw). An earlier version hard-rejected this case
+   *    too, which turned out to be a real problem: it would permanently
+   *    lock out a genuine second person who happens to share a name with
+   *    someone already registered — not rare in a school-sized
+   *    institution (siblings, common names). Now it's surfaced to the
+   *    Admin reviewing the request (RegistrationRequest.possibleDuplicate)
+   *    instead of silently blocking a real person.
+   *
+   * Exact (case-insensitive, trimmed) match only in both cases — not
+   * fuzzy/typo-tolerant.
    */
-  private async assertNoDuplicate(
+  private async checkForDuplicate(
     institutionId: string,
     entityType: FieldEntityType.Participant | FieldEntityType.Staff,
     firstName: string,
     lastName: string,
-  ): Promise<void> {
-    const alreadyApproved =
-      entityType === FieldEntityType.Staff
-        ? await this.staffService.existsByName(
-            institutionId,
-            firstName,
-            lastName,
-          )
-        : await this.participantsService.existsByName(
-            institutionId,
-            firstName,
-            lastName,
-          );
-    if (alreadyApproved) {
-      throw AppError.conflict(
-        'A record with this name already exists at this institution. If this is you, contact the institution for your login details instead of registering again.',
-        'DUPLICATE_NAME',
-      );
-    }
-
+  ): Promise<{ possibleDuplicate: boolean }> {
     const pendingDuplicate = await this.requestModel
       .exists({
         institutionId,
@@ -140,6 +130,20 @@ export class RegistrationRequestsService {
         'DUPLICATE_PENDING_REQUEST',
       );
     }
+
+    const alreadyApproved =
+      entityType === FieldEntityType.Staff
+        ? await this.staffService.existsByName(
+            institutionId,
+            firstName,
+            lastName,
+          )
+        : await this.participantsService.existsByName(
+            institutionId,
+            firstName,
+            lastName,
+          );
+    return { possibleDuplicate: alreadyApproved };
   }
 
   /**
@@ -154,13 +158,10 @@ export class RegistrationRequestsService {
     const entityType = dto.entityType ?? FieldEntityType.Participant;
 
     // Duplicate detection (spec 13.1 originally documented this as
-    // "left to manual admin review" — v1 shipped with none at all. Added
-    // per explicit product request: catches the two realistic cases
-    // (already-approved person re-registering because they forgot their
-    // credentials, and an accidental double-submit of the same pending
-    // request) without being a fuzzy/typo-tolerant matcher — same name,
-    // same institution, same entity type, exact (case-insensitive) match.
-    await this.assertNoDuplicate(
+    // "left to manual admin review" — v1 shipped with none at all). See
+    // checkForDuplicate's own comment for why the two cases are handled
+    // differently (hard block vs. a flag for the Admin to judge).
+    const { possibleDuplicate } = await this.checkForDuplicate(
       dto.institutionId,
       entityType,
       dto.firstName,
@@ -195,6 +196,7 @@ export class RegistrationRequestsService {
         customFields: dto.customFields ?? [],
       },
       status: RegistrationRequestStatus.Pending,
+      possibleDuplicate,
     });
   }
 

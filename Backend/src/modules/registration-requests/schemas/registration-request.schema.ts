@@ -83,6 +83,21 @@ export class RegistrationRequest {
     default: FieldEntityType.Participant,
   })
   entityType: FieldEntityType.Participant | FieldEntityType.Staff;
+
+  /**
+   * True if, at submission time, an already-approved Participant/Staff
+   * record with this exact name existed at the institution. Deliberately a
+   * *warning* surfaced to the Admin reviewing the request, not a hard
+   * block — an earlier version rejected the submission outright, which
+   * would permanently lock out a genuine second person who happens to
+   * share a name with someone already registered (not rare at all in a
+   * school-sized institution). Computed once at submit() and persisted
+   * rather than recomputed on every list/approve call, so it reflects what
+   * was true when the person actually registered even if the matching
+   * record is later renamed/deleted.
+   */
+  @Prop({ default: false })
+  possibleDuplicate: boolean;
 }
 
 export const RegistrationRequestSchema =

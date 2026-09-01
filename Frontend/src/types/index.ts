@@ -123,6 +123,8 @@ export interface RegistrationRequest {
   institutionId: string;
   status: RegistrationRequestStatus;
   entityType: FieldEntityType;
+  /** True if an approved record with this exact name already existed at submit time — a hint for the admin, not a hard block. */
+  possibleDuplicate: boolean;
   requestedData: {
     firstName: string;
     lastName: string;
