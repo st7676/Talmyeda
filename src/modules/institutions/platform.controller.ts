@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { Roles } from '../../common/decorators';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import { InstitutionStatus, Role } from '../../common/enums';
+import { Role } from '../../common/enums';
+import { QueryInstitutionsDto } from './dto/query-institutions.dto';
 import { InstitutionsService } from './institutions.service';
 
 /**
@@ -13,13 +13,20 @@ import { InstitutionsService } from './institutions.service';
 export class PlatformController {
   constructor(private readonly institutionsService: InstitutionsService) {}
 
-  /** GET /platform/institutions?status=Pending */
+  /**
+   * GET /platform/institutions?status=Pending
+   *
+   * Bug fixed here: `status` and pagination used to be two separate
+   * @Query() bindings (one loose param, one DTO). Since the global
+   * ValidationPipe runs with forbidNonWhitelisted: true, the pagination DTO
+   * — which didn't declare `status` — rejected every request that included
+   * a status filter with "property status should not exist", silently
+   * breaking this filter entirely. Found while wiring up the frontend's
+   * platform-admin screen. Now a single combined DTO handles both.
+   */
   @Get()
-  list(
-    @Query('status') status: InstitutionStatus | undefined,
-    @Query() pagination: PaginationQueryDto,
-  ) {
-    return this.institutionsService.listByStatus(status, pagination);
+  list(@Query() query: QueryInstitutionsDto) {
+    return this.institutionsService.listByStatus(query.status, query);
   }
 
   @Post(':id/approve')
