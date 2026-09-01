@@ -1,20 +1,26 @@
 import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
+import Alert from '@mui/material/Alert';
 import CheckIcon from '@mui/icons-material/Check';
 import BlockIcon from '@mui/icons-material/Block';
 import ReplayIcon from '@mui/icons-material/Replay';
 import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { DataTable, type Column } from '../components/DataTable';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { platformApi } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 import { useNotify } from '../context/NotificationContext';
+import { getPublicAppUrl } from '../utils/publicAppUrl';
 import type { Institution } from '../types';
 import { InstitutionStatus } from '../types';
 
@@ -43,6 +49,15 @@ export function PlatformInstitutionsPage() {
   const [status, setStatus] = useState<InstitutionStatus | ''>('');
   const [loading, setLoading] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+
+  const publicAppUrl = getPublicAppUrl();
+  const registrationLink = publicAppUrl ? `${publicAppUrl}/register` : null;
+
+  const copyRegistrationLink = () => {
+    if (!registrationLink) return;
+    void navigator.clipboard.writeText(registrationLink);
+    notify('הקישור הועתק', 'success');
+  };
 
   const load = () => {
     setLoading(true);
@@ -101,6 +116,51 @@ export function PlatformInstitutionsPage() {
       <Typography variant="h4" sx={{ mb: 3 }}>
         ניהול מוסדות (מנהל-על)
       </Typography>
+
+      {/*
+        Real request handled here: institution signup is no longer
+        discoverable from the shared /login page (any visitor, mostly
+        students/staff, used to see it there — removed in an earlier
+        change). Now the only way a new institution finds /register is if
+        the SUPER_ADMIN proactively sends them this link — same
+        copy-a-shareable-link pattern already used for the student/staff
+        join links in Settings.
+      */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          קישור לרישום מוסד חדש
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          הקישור הזה כבר לא מופיע במסך ההתחברות — יש לשלוח אותו ישירות למוסד שרוצה להצטרף
+          למערכת. המוסד יירשם במצב "ממתין לאישור" ויופיע ברשימה למטה.
+        </Typography>
+        {registrationLink ? (
+          <TextField
+            value={registrationLink}
+            fullWidth
+            size="small"
+            slotProps={{
+              input: {
+                readOnly: true,
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={copyRegistrationLink} size="small" title="העתקת קישור">
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+        ) : (
+          <Alert severity="warning">
+            אי אפשר להציג קישור שיתופי מתוך אפליקציית הדסקטופ (הוא לא נגיש דרך דפדפן חיצוני).
+            כדי לקבל קישור אמיתי, יש להגדיר את משתנה הסביבה <code>VITE_PUBLIC_APP_URL</code>{' '}
+            בעת בניית האפליקציה לכתובת שבה הפרונטנד מתארח כאתר רגיל.
+          </Alert>
+        )}
+      </Paper>
+
       <DataTable
         columns={columns}
         rows={items}

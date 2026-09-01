@@ -17,20 +17,7 @@ import { institutionsApi } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 import { useNotify } from '../context/NotificationContext';
 import { ParticipantUserMode } from '../types';
-
-/**
- * The join link must open in a regular browser (students won't install the
- * desktop app), so it can't be built from window.location when running
- * inside Electron (a file:// URL, not shareable). VITE_PUBLIC_APP_URL should
- * point at wherever this same frontend is also hosted as a plain website;
- * falls back to the current origin for the web/dev-server build.
- */
-function getPublicAppUrl(): string | null {
-  const configured = import.meta.env.VITE_PUBLIC_APP_URL as string | undefined;
-  if (configured) return configured.replace(/\/$/, '');
-  if (window.location.protocol === 'file:') return null;
-  return window.location.origin;
-}
+import { getPublicAppUrl } from '../utils/publicAppUrl';
 
 interface SettingsForm {
   participantUserMode: ParticipantUserMode;
