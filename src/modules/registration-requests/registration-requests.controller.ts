@@ -6,6 +6,7 @@ import { AppError } from '../../common/errors/app-error';
 import type { AuthenticatedUser } from '../../common/interfaces';
 import { CheckAbility } from '../casl/decorators/check-ability.decorator';
 import { ApproveRegistrationRequestDto } from './dto/approve-registration-request.dto';
+import { PublicFieldsQueryDto } from './dto/public-fields-query.dto';
 import { QueryRegistrationRequestsDto } from './dto/query-registration-requests.dto';
 import { SubmitRegistrationRequestDto } from './dto/submit-registration-request.dto';
 import { RegistrationRequestsService } from './registration-requests.service';
@@ -26,6 +27,19 @@ export class RegistrationRequestsController {
   @Post()
   submit(@Body() dto: SubmitRegistrationRequestDto) {
     return this.registrationRequestsService.submit(dto);
+  }
+
+  /**
+   * GET /registration-requests/fields — public, unauthenticated. Lets the
+   * join form render the institution's configured custom fields for the
+   * chosen entity type before submitting. Rate-limited more loosely than
+   * submit() since it's read-only, but still public and worth capping.
+   */
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Get('fields')
+  getFields(@Query() query: PublicFieldsQueryDto) {
+    return this.registrationRequestsService.getPublicFields(query);
   }
 
   /** GET /registration-requests — Administrator only (spec 84). */

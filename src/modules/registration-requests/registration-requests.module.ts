@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { DynamicFieldsModule } from '../dynamic-fields/dynamic-fields.module';
+import { FieldDefinitionsModule } from '../field-definitions/field-definitions.module';
+import { FieldOptionsModule } from '../field-options/field-options.module';
 import { InstitutionsModule } from '../institutions/institutions.module';
 import { ParticipantsModule } from '../participants/participants.module';
+import { StaffModule } from '../staff/staff.module';
 import { UsersModule } from '../users/users.module';
 import { RegistrationRequestsController } from './registration-requests.controller';
 import { RegistrationRequestsService } from './registration-requests.service';
@@ -18,8 +21,11 @@ import {
     ]),
     InstitutionsModule,
     ParticipantsModule,
+    StaffModule,
     UsersModule,
     DynamicFieldsModule,
+    FieldDefinitionsModule,
+    FieldOptionsModule,
   ],
   controllers: [RegistrationRequestsController],
   providers: [RegistrationRequestsService],

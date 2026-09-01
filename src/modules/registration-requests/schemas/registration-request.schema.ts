@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
+import { FieldEntityType } from '../../../common/enums';
 
 export type RegistrationRequestDocument = HydratedDocument<RegistrationRequest>;
 
@@ -66,6 +67,22 @@ export class RegistrationRequest {
     index: true,
   })
   status: RegistrationRequestStatus;
+
+  /**
+   * Which entity self-registration produces on approval. Defaults to
+   * Participant for backward compatibility with requests submitted before
+   * this field existed (spec 13-15 originally only covered participants;
+   * extended to support Staff self-registration too — never Group, that
+   * has no self-registration concept). Only Participant/Staff are valid
+   * here; enforced by SubmitRegistrationRequestDto's @IsIn, not by the
+   * Mongoose enum (which would also have to include Group otherwise).
+   */
+  @Prop({
+    type: String,
+    enum: [FieldEntityType.Participant, FieldEntityType.Staff],
+    default: FieldEntityType.Participant,
+  })
+  entityType: FieldEntityType.Participant | FieldEntityType.Staff;
 }
 
 export const RegistrationRequestSchema =

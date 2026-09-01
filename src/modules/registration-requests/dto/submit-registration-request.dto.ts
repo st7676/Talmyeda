@@ -1,6 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { CustomFieldEntryDto } from '../../../common/dto/custom-field-entry.dto';
+import { FieldEntityType } from '../../../common/enums';
 
 /**
  * Spec section 84 (Submit Registration Request). The submitter is not yet
@@ -20,6 +27,17 @@ export class SubmitRegistrationRequestDto {
 
   @IsString()
   lastName: string;
+
+  /**
+   * Which entity to create on approval. Defaults to Participant (original
+   * behavior). Group is deliberately not a valid value here — restricted at
+   * the DTO/validation level rather than reusing the full FieldEntityType
+   * enum, since self-registration only makes sense for a person joining as
+   * a learner or a staff member, never a Group.
+   */
+  @IsOptional()
+  @IsIn([FieldEntityType.Participant, FieldEntityType.Staff])
+  entityType?: FieldEntityType.Participant | FieldEntityType.Staff;
 
   @IsOptional()
   @IsArray()
