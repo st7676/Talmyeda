@@ -6,6 +6,14 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import Alert from '@mui/material/Alert';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import { DataTable, type Column } from '../components/DataTable';
@@ -44,7 +52,12 @@ export function RegistrationRequestsPage() {
   );
   const [loading, setLoading] = useState(false);
   const [approveTarget, setApproveTarget] = useState<RegistrationRequest | null>(null);
+  const [createUserChecked, setCreateUserChecked] = useState(true);
+  const [approving, setApproving] = useState(false);
   const [rejectTarget, setRejectTarget] = useState<RegistrationRequest | null>(null);
+  const [createdCreds, setCreatedCreds] = useState<{ username: string; tempPassword: string } | null>(
+    null,
+  );
 
   const load = () => {
     setLoading(true);
@@ -60,14 +73,21 @@ export function RegistrationRequestsPage() {
 
   useEffect(load, [page, limit, status]);
 
-  const handleApprove = async (createUser: boolean) => {
+  const handleApprove = async () => {
     if (!approveTarget) return;
+    setApproving(true);
     try {
-      await registrationRequestsApi.approve(approveTarget._id, createUser);
+      const result = await registrationRequestsApi.approve(approveTarget._id, createUserChecked);
       notify('הבקשה אושרה', 'success');
+      setApproveTarget(null);
+      if (result.username && result.tempPassword) {
+        setCreatedCreds({ username: result.username, tempPassword: result.tempPassword });
+      }
       load();
     } catch (err) {
       notify(getErrorMessage(err), 'error');
+    } finally {
+      setApproving(false);
     }
   };
 
@@ -147,7 +167,10 @@ export function RegistrationRequestsPage() {
                 size="small"
                 startIcon={<CheckIcon />}
                 color="success"
-                onClick={() => setApproveTarget(row)}
+                onClick={() => {
+                  setCreateUserChecked(true);
+                  setApproveTarget(row);
+                }}
               >
                 אישור
               </Button>
@@ -164,18 +187,55 @@ export function RegistrationRequestsPage() {
         }
       />
 
-      <ConfirmDialog
-        open={!!approveTarget}
-        title="אישור בקשת הרשמה"
-        description={
-          approveTarget
-            ? `לאשר את הבקשה של ${approveTarget.requestedData.firstName} ${approveTarget.requestedData.lastName}? תיווצר רשומת ${entityTypeLabel[approveTarget.entityType] ?? approveTarget.entityType}.`
-            : ''
-        }
-        confirmLabel="אישור"
-        onConfirm={() => handleApprove(false)}
-        onClose={() => setApproveTarget(null)}
-      />
+      <Dialog open={!!approveTarget} onClose={() => setApproveTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>אישור בקשת הרשמה</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            {approveTarget &&
+              `לאשר את הבקשה של ${approveTarget.requestedData.firstName} ${approveTarget.requestedData.lastName}? תיווצר רשומת ${entityTypeLabel[approveTarget.entityType] ?? approveTarget.entityType}.`}
+          </DialogContentText>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={createUserChecked}
+                onChange={(e) => setCreateUserChecked(e.target.checked)}
+              />
+            }
+            label="צור גם פרטי התחברות (שם משתמש + סיסמה זמנית)"
+          />
+          {!createUserChecked && (
+            <Alert severity="info" sx={{ mt: 1 }}>
+              בלי סימון זה, הרשומה תיווצר אך לא ייווצר חשבון התחברות — אפשר ליצור אחד מאוחר יותר
+              במסך "משתמשים".
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setApproveTarget(null)}>ביטול</Button>
+          <Button variant="contained" onClick={handleApprove} disabled={approving}>
+            אישור
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!createdCreds} onClose={() => setCreatedCreds(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>נוצרו פרטי התחברות</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            יש למסור את הפרטים הבאים למשתמש. הסיסמה הזמנית מוצגת פעם אחת בלבד — לא ניתן לשחזר
+            אותה לאחר סגירת החלון.
+          </Alert>
+          <Typography>
+            <strong>שם משתמש:</strong> {createdCreds?.username}
+          </Typography>
+          <Typography>
+            <strong>סיסמה זמנית:</strong> {createdCreds?.tempPassword}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreatedCreds(null)}>סגירה</Button>
+        </DialogActions>
+      </Dialog>
       <ConfirmDialog
         open={!!rejectTarget}
         title="דחיית בקשת הרשמה"

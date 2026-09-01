@@ -180,7 +180,18 @@ export const registrationRequestsApi = {
       .get<{ data: Paginated<RegistrationRequest> }>('/registration-requests', { params })
       .then((r) => r.data.data),
   approve: (id: string, createUser?: boolean) =>
-    api.post(`/registration-requests/${id}/approve`, { createUser }).then((r) => r.data.data),
+    api
+      .post<{
+        data: {
+          requestId: string;
+          entityType: FieldEntityType;
+          participantId?: string;
+          staffId?: string;
+          username?: string;
+          tempPassword?: string;
+        };
+      }>(`/registration-requests/${id}/approve`, { createUser })
+      .then((r) => r.data.data),
   reject: (id: string) =>
     api.post(`/registration-requests/${id}/reject`).then((r) => r.data.data),
 };
