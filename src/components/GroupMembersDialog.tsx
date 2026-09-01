@@ -74,7 +74,7 @@ function ParticipantMembers({ groupId }: { groupId: string }) {
   const load = () => {
     setLoading(true);
     Promise.all([
-      participantsApi.list({ page: 1, limit: 200 }),
+      participantsApi.list({ page: 1, limit: 100 }),
       participantGroupsApi.listForGroup(groupId),
     ])
       .then(([participantsRes, membershipsRes]) => {
@@ -184,7 +184,7 @@ function StaffMembers({ groupId }: { groupId: string }) {
 
   const load = () => {
     setLoading(true);
-    Promise.all([staffApi.list({ page: 1, limit: 200 }), staffGroupsApi.listForGroup(groupId)])
+    Promise.all([staffApi.list({ page: 1, limit: 100 }), staffGroupsApi.listForGroup(groupId)])
       .then(([staffRes, membershipsRes]) => {
         setAllStaff(staffRes.items);
         setMemberships(
