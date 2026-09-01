@@ -8,11 +8,8 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Stack from '@mui/material/Stack';
-import IconButton from '@mui/material/IconButton';
 import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { DataTable, type Column } from '../components/DataTable';
+import { EntityCardGrid } from '../components/EntityCardGrid';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CustomFieldsEditor } from '../components/CustomFieldsEditor';
 import { useFieldDefinitions } from '../hooks/useFieldDefinitions';
@@ -32,7 +29,7 @@ export function StaffPage() {
   const [items, setItems] = useState<Staff[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [limit, setLimit] = useState(20);
+  const [limit, setLimit] = useState(12);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
   const [loading, setLoading] = useState(false);
@@ -99,25 +96,14 @@ export function StaffPage() {
     }
   };
 
-  const columns: Column<Staff>[] = [
-    { key: 'firstName', label: 'שם פרטי', render: (r) => r.firstName },
-    { key: 'lastName', label: 'שם משפחה', render: (r) => r.lastName },
-    {
-      key: 'createdAt',
-      label: 'נוצר בתאריך',
-      render: (r) => new Date(r.createdAt).toLocaleDateString('he-IL'),
-    },
-  ];
-
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 3 }}>
         צוות
       </Typography>
-      <DataTable
-        columns={columns}
-        rows={items}
-        rowKey={(r) => r._id}
+      <EntityCardGrid
+        items={items}
+        fieldDefinitions={fields}
         total={total}
         page={page}
         limit={limit}
@@ -137,16 +123,8 @@ export function StaffPage() {
             הוספת איש צוות
           </Button>
         }
-        actions={(row) => (
-          <Stack direction="row">
-            <IconButton size="small" onClick={() => openEdit(row)}>
-              <EditIcon fontSize="small" />
-            </IconButton>
-            <IconButton size="small" color="error" onClick={() => setDeleteTarget(row)}>
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-        )}
+        onEdit={openEdit}
+        onDelete={setDeleteTarget}
       />
 
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
