@@ -218,6 +218,7 @@ export class RegistrationRequestsService {
     entityType: FieldEntityType.Participant | FieldEntityType.Staff;
     participantId?: string;
     staffId?: string;
+    username?: string;
     tempPassword?: string;
   }> {
     const request = await this.getPending(id, institutionId);
@@ -242,6 +243,7 @@ export class RegistrationRequestsService {
       customFields: request.requestedData.customFields,
     });
 
+    let username: string | undefined;
     let tempPassword: string | undefined;
     const shouldCreateUser =
       settings.participantUserMode === ParticipantUserMode.Always ||
@@ -249,14 +251,15 @@ export class RegistrationRequestsService {
         dto.createUser === true);
 
     if (shouldCreateUser) {
-      const plain = await this.createLoginFor(
+      const login = await this.createLoginFor(
         institutionId,
         request.requestedData.firstName,
         request.requestedData.lastName,
         Role.Participant,
         { participantId: participant._id },
       );
-      tempPassword = plain;
+      username = login.username;
+      tempPassword = login.tempPassword;
     }
 
     request.status = RegistrationRequestStatus.Approved;
@@ -266,6 +269,7 @@ export class RegistrationRequestsService {
       requestId: request._id.toString(),
       entityType: FieldEntityType.Participant as const,
       participantId: participant._id.toString(),
+      username,
       tempPassword,
     };
   }
@@ -288,15 +292,18 @@ export class RegistrationRequestsService {
       customFields: request.requestedData.customFields,
     });
 
+    let username: string | undefined;
     let tempPassword: string | undefined;
     if (dto.createUser === true) {
-      tempPassword = await this.createLoginFor(
+      const login = await this.createLoginFor(
         institutionId,
         request.requestedData.firstName,
         request.requestedData.lastName,
         Role.Staff,
         { staffId: staff._id },
       );
+      username = login.username;
+      tempPassword = login.tempPassword;
     }
 
     request.status = RegistrationRequestStatus.Approved;
@@ -306,6 +313,7 @@ export class RegistrationRequestsService {
       requestId: request._id.toString(),
       entityType: FieldEntityType.Staff as const,
       staffId: staff._id.toString(),
+      username,
       tempPassword,
     };
   }
@@ -316,10 +324,10 @@ export class RegistrationRequestsService {
     lastName: string,
     role: Role,
     link: { participantId?: Types.ObjectId; staffId?: Types.ObjectId },
-  ): Promise<string> {
+  ): Promise<{ username: string; tempPassword: string }> {
     const username = this.generateUsername(firstName, lastName);
-    const plain = generateTempPassword();
-    const passwordHash = await hashPassword(plain);
+    const tempPassword = generateTempPassword();
+    const passwordHash = await hashPassword(tempPassword);
     await this.usersService.createRaw({
       institutionId,
       username,
@@ -328,7 +336,13 @@ export class RegistrationRequestsService {
       ...link,
       mustChangePassword: true,
     });
-    return plain;
+    // Bug fixed here: this used to return only the password, discarding the
+    // generated username — the caller (and therefore the API response, and
+    // therefore the frontend) had no way to tell the approving Admin what
+    // username the new login actually got, making the returned tempPassword
+    // useless on its own. Found while auditing "how does an approved
+    // participant/staff actually log in".
+    return { username, tempPassword };
   }
 
   /** POST /registration-requests/:id/reject. Spec section 15. */
