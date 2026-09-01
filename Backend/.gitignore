@@ -1,0 +1,29 @@
+# compiled output
+/dist
+/node_modules
+
+# logs
+*.log
+npm-debug.log*
+
+# environment
+.env
+.env.*.local
+
+# tests
+/coverage
+/test/coverage
+
+# IDE
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+
+# Claude Code runtime artifacts (session locks, etc.)
+.claude/scheduled_tasks.lock
