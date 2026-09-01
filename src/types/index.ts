@@ -180,3 +180,20 @@ export interface Institution {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface InstitutionSettings {
+  _id: string;
+  institutionId: string;
+  participantUserMode: ParticipantUserMode;
+  selfRegistrationEnabled: boolean;
+  requireApproval: boolean;
+  allowMultipleGroups: boolean;
+  staffGroupManagementEnabled: boolean;
+  updatedAt: string;
+}
+
+/** Actual shape of GET /institutions/me — nested, not flat. */
+export interface InstitutionMe {
+  institution: Institution;
+  settings: InstitutionSettings | null;
+}

@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppLayout } from './components/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterInstitutionPage } from './pages/RegisterInstitutionPage';
+import { JoinPage } from './pages/JoinPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MyProfilePage } from './pages/MyProfilePage';
@@ -26,6 +27,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterInstitutionPage />} />
+            <Route path="/join" element={<JoinPage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
 
             <Route

@@ -9,6 +9,8 @@ import type {
   FieldDefinition,
   FieldOption,
   Institution,
+  InstitutionMe,
+  InstitutionSettings,
   CustomFieldValue,
   FieldEntityType,
   AccountStatus,
@@ -34,14 +36,18 @@ export const institutionsApi = {
     api
       .post('/institutions/register', { institutionName, adminUsername, adminPassword })
       .then((r) => r.data.data),
-  me: () => api.get<{ data: Institution }>('/institutions/me').then((r) => r.data.data),
+  /** GET /institutions/me returns { institution, settings } — nested, not a flat Institution. */
+  me: () => api.get<{ data: InstitutionMe }>('/institutions/me').then((r) => r.data.data),
   updateSettings: (body: {
     participantUserMode?: ParticipantUserMode;
     selfRegistrationEnabled?: boolean;
     requireApproval?: boolean;
     allowMultipleGroups?: boolean;
     staffGroupManagementEnabled?: boolean;
-  }) => api.put('/institutions/settings', body).then((r) => r.data.data),
+  }) =>
+    api
+      .put<{ data: InstitutionSettings }>('/institutions/settings', body)
+      .then((r) => r.data.data),
 };
 
 // ---------- Platform (SUPER_ADMIN only) ----------
