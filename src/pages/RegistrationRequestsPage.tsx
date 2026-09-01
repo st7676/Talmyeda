@@ -75,6 +75,7 @@ export function RegistrationRequestsPage() {
 
   const handleApprove = async () => {
     if (!approveTarget) return;
+    const entityType = approveTarget.entityType;
     setApproving(true);
     try {
       const result = await registrationRequestsApi.approve(approveTarget._id, createUserChecked);
@@ -82,6 +83,20 @@ export function RegistrationRequestsPage() {
       setApproveTarget(null);
       if (result.username && result.tempPassword) {
         setCreatedCreds({ username: result.username, tempPassword: result.tempPassword });
+      } else if (createUserChecked) {
+        // Real gap this closes: silently no credentials, with no explanation,
+        // is exactly the "student can't log in and nobody knows why" report.
+        // For Participant this happens when the institution's
+        // "מצב יצירת משתמשים למשתתפים" setting is 'אף פעם' — that setting
+        // overrides the checkbox entirely (see Settings). Staff always
+        // follows the checkbox directly, so this branch shouldn't happen
+        // for Staff approvals, but the message stays generic just in case.
+        notify(
+          entityType === FieldEntityType.Participant
+            ? 'לא נוצר חשבון התחברות — ב"הגדרות מוסד" מצב יצירת המשתמשים למשתתפים מוגדר ל"אף פעם". אפשר לשנות שם, או ליצור משתמש ידנית במסך "משתמשים".'
+            : 'לא נוצר חשבון התחברות. אפשר ליצור אחד ידנית במסך "משתמשים".',
+          'warning',
+        );
       }
       load();
     } catch (err) {
