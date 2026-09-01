@@ -14,6 +14,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import SettingsIcon from '@mui/icons-material/Settings';
 import DomainIcon from '@mui/icons-material/Domain';
+import MailIcon from '@mui/icons-material/Mail';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
 import type { ReactNode } from 'react';
@@ -28,6 +29,7 @@ const cards: { label: string; desc: string; path: string; icon: ReactNode; roles
   { label: 'שדות מותאמים', desc: 'הגדרת שדות דינמיים', path: '/field-definitions', icon: <TuneIcon fontSize="large" />, roles: [Role.Admin] },
   { label: 'משתמשים', desc: 'ניהול משתמשי מערכת', path: '/users', icon: <ManageAccountsIcon fontSize="large" />, roles: [Role.Admin] },
   { label: 'הגדרות מוסד', desc: 'תצורת המוסד', path: '/settings', icon: <SettingsIcon fontSize="large" />, roles: [Role.Admin] },
+  { label: 'הודעות', desc: 'פנייה למנהל/ת או תיבת הודעות נכנסות', path: '/messages', icon: <MailIcon fontSize="large" />, roles: [Role.Admin, Role.Staff, Role.Participant] },
 ];
 
 export function DashboardPage() {

@@ -212,3 +212,16 @@ export interface InstitutionMe {
   institution: Institution;
   settings: InstitutionSettings | null;
 }
+
+export interface Message {
+  _id: string;
+  institutionId: string;
+  fromUserId: string;
+  fromRole: typeof Role.Participant | typeof Role.Staff;
+  fromUsername: string;
+  body: string;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

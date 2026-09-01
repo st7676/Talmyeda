@@ -26,6 +26,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import SettingsIcon from '@mui/icons-material/Settings';
 import DomainIcon from '@mui/icons-material/Domain';
+import MailIcon from '@mui/icons-material/Mail';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
@@ -51,6 +52,12 @@ const navSections: NavSection[] = [
     items: [
       { label: 'לוח בקרה', path: '/', icon: <DashboardIcon />, roles: [Role.Admin, Role.Staff, Role.Participant] },
       { label: 'הפרופיל שלי', path: '/my-profile', icon: <PersonIcon />, roles: [Role.Participant, Role.Staff] },
+      {
+        label: 'הודעות',
+        path: '/messages',
+        icon: <MailIcon />,
+        roles: [Role.Admin, Role.Staff, Role.Participant],
+      },
     ],
   },
   {

@@ -18,6 +18,7 @@ import type {
   ParticipantUserMode,
   InstitutionStatus,
   PublicFieldMeta,
+  Message,
 } from '../types';
 
 // ---------- Auth ----------
@@ -225,4 +226,20 @@ export const fieldOptionsApi = {
   update: (id: string, body: Partial<{ label: string; value: string; order: number }>) =>
     api.put(`/field-options/${id}`, body).then((r) => r.data.data),
   remove: (id: string) => api.delete(`/field-options/${id}`).then((r) => r.data.data),
+};
+
+// ---------- Messages ----------
+export const messagesApi = {
+  send: (body: string) => api.post('/messages', { body }).then((r) => r.data.data),
+  /** Own sent messages (PARTICIPANT/STAFF). */
+  mine: (params: ListParams) =>
+    api
+      .get<{ data: Paginated<Message> }>('/messages/mine', { params })
+      .then((r) => r.data.data),
+  /** Admin inbox. */
+  list: (params: ListParams & { unreadOnly?: boolean }) =>
+    api.get<{ data: Paginated<Message> }>('/messages', { params }).then((r) => r.data.data),
+  unreadCount: () =>
+    api.get<{ data: { count: number } }>('/messages/unread-count').then((r) => r.data.data.count),
+  markRead: (id: string) => api.post(`/messages/${id}/read`).then((r) => r.data.data),
 };

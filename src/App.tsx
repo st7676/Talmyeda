@@ -17,6 +17,7 @@ import { FieldDefinitionsPage } from './pages/FieldDefinitionsPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PlatformInstitutionsPage } from './pages/PlatformInstitutionsPage';
+import { MessagesPage } from './pages/MessagesPage';
 import { Role } from './types';
 
 function App() {
@@ -100,6 +101,14 @@ function App() {
                 element={
                   <ProtectedRoute roles={[Role.SuperAdmin]}>
                     <PlatformInstitutionsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/messages"
+                element={
+                  <ProtectedRoute roles={[Role.Admin, Role.Participant, Role.Staff]}>
+                    <MessagesPage />
                   </ProtectedRoute>
                 }
               />
