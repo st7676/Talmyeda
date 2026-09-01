@@ -8,27 +8,30 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Link from '@mui/material/Link';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import Stack from '@mui/material/Stack';
+import Chip from '@mui/material/Chip';
 import { registrationRequestsApi } from '../api/endpoints';
 import { getErrorMessage } from '../api/client';
 import { PublicCustomFieldsEditor } from '../components/PublicCustomFieldsEditor';
 import type { CustomFieldValue, PublicFieldMeta } from '../types';
 import { FieldEntityType } from '../types';
 
-const roleLabels: Record<typeof FieldEntityType.Participant | typeof FieldEntityType.Staff, string> = {
+type SelfRegRole = typeof FieldEntityType.Participant | typeof FieldEntityType.Staff;
+
+const roleLabels: Record<SelfRegRole, string> = {
   [FieldEntityType.Participant]: 'תלמיד/ה',
   [FieldEntityType.Staff]: 'איש/אשת צוות',
 };
 
+/** ?role=participant|staff — each institution shares a separate link per audience (see Settings). */
+function roleFromParam(raw: string | null): SelfRegRole {
+  return raw === 'staff' ? FieldEntityType.Staff : FieldEntityType.Participant;
+}
+
 export function JoinPage() {
   const [searchParams] = useSearchParams();
   const institutionId = searchParams.get('institution') ?? '';
+  const entityType = roleFromParam(searchParams.get('role'));
 
-  const [entityType, setEntityType] = useState<typeof FieldEntityType.Participant | typeof FieldEntityType.Staff>(
-    FieldEntityType.Participant,
-  );
   const [fields, setFields] = useState<PublicFieldMeta[]>([]);
   const [fieldsLoading, setFieldsLoading] = useState(true);
   const [fieldsError, setFieldsError] = useState<string | null>(null);
@@ -44,7 +47,6 @@ export function JoinPage() {
     if (!institutionId) return;
     setFieldsLoading(true);
     setFieldsError(null);
-    setCustomFields([]);
     registrationRequestsApi
       .getPublicFields(institutionId, entityType)
       .then(setFields)
@@ -119,25 +121,9 @@ export function JoinPage() {
             <Typography variant="h5" sx={{ mb: 1, textAlign: 'center' }}>
               הרשמה למוסד
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
-              מלא/י את הפרטים כדי לשלוח בקשת הרשמה
-            </Typography>
-
-            <Stack sx={{ alignItems: 'center', mb: 3 }}>
-              <ToggleButtonGroup
-                value={entityType}
-                exclusive
-                onChange={(_, v) => v && setEntityType(v)}
-                size="small"
-              >
-                <ToggleButton value={FieldEntityType.Participant}>
-                  {roleLabels[FieldEntityType.Participant]}
-                </ToggleButton>
-                <ToggleButton value={FieldEntityType.Staff}>
-                  {roleLabels[FieldEntityType.Staff]}
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Stack>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <Chip label={`נרשמים בתור: ${roleLabels[entityType]}`} color="primary" />
+            </Box>
 
             <Box
               component="form"

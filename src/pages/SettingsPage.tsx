@@ -81,11 +81,16 @@ export function SettingsPage() {
   }, []);
 
   const publicAppUrl = getPublicAppUrl();
-  const joinLink = publicAppUrl ? `${publicAppUrl}/join?institution=${institutionId}` : null;
+  const participantJoinLink = publicAppUrl
+    ? `${publicAppUrl}/join?institution=${institutionId}&role=participant`
+    : null;
+  const staffJoinLink = publicAppUrl
+    ? `${publicAppUrl}/join?institution=${institutionId}&role=staff`
+    : null;
 
-  const copyJoinLink = () => {
-    if (!joinLink) return;
-    void navigator.clipboard.writeText(joinLink);
+  const copyLink = (link: string | null) => {
+    if (!link) return;
+    void navigator.clipboard.writeText(link);
     notify('הקישור הועתק', 'success');
   };
 
@@ -110,34 +115,73 @@ export function SettingsPage() {
       </Typography>
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 1 }}>
-          קישור הרשמה לתלמידים
+          קישורי הרשמה עצמית
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          שתפ/י את הקישור הזה עם תלמידים כדי שיוכלו להירשם בעצמם (בכפוף להגדרת "אפשר הרשמה
-          עצמית" למטה). כל בקשה תמתין לאישורך במסך "בקשות הרשמה".
+          שני קישורים נפרדים — אחד לתלמידים ואחד לצוות — כל אחד פותח טופס עם השדות המתאימים
+          לאותו קהל (בכפוף להגדרת "אפשר הרשמה עצמית" למטה). כל בקשה תמתין לאישורך במסך "בקשות
+          הרשמה".
         </Typography>
-        {joinLink ? (
-          <TextField
-            value={joinLink}
-            fullWidth
-            size="small"
-            slotProps={{
-              input: {
-                readOnly: true,
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={copyJoinLink} size="small" title="העתקת קישור">
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
+
+        {participantJoinLink && staffJoinLink ? (
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
+                לתלמידים
+              </Typography>
+              <TextField
+                value={participantJoinLink}
+                fullWidth
+                size="small"
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => copyLink(participantJoinLink)}
+                          size="small"
+                          title="העתקת קישור"
+                        >
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600 }}>
+                לצוות
+              </Typography>
+              <TextField
+                value={staffJoinLink}
+                fullWidth
+                size="small"
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={() => copyLink(staffJoinLink)}
+                          size="small"
+                          title="העתקת קישור"
+                        >
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            </Box>
+          </Stack>
         ) : (
           <Alert severity="warning">
-            אי אפשר להציג קישור שיתופי מתוך אפליקציית הדסקטופ (הוא לא נגיש דרך דפדפן חיצוני).
-            כדי לקבל קישור אמיתי, יש להגדיר את משתנה הסביבה{' '}
+            אי אפשר להציג קישורים שיתופיים מתוך אפליקציית הדסקטופ (הם לא נגישים דרך דפדפן
+            חיצוני). כדי לקבל קישורים אמיתיים, יש להגדיר את משתנה הסביבה{' '}
             <code>VITE_PUBLIC_APP_URL</code> בעת בניית האפליקציה לכתובת שבה הפרונטנד מתארח
             כאתר רגיל (לא רק כתוכנת דסקטופ).
           </Alert>
